@@ -147,22 +147,7 @@
         <p class="text-[#5F6368] text-[15px] mb-3">Sign in with:</p>
 
         <!-- Tombol Login Google (Official Google Identity Services) -->
-        <div id="g_id_onload"
-             data-client_id="MASUKKAN_GOOGLE_CLIENT_ID_KAMU_DISINI"
-             data-callback="handleCredentialResponse"
-             data-auto_prompt="false">
-        </div>
-        <div class="g_id_signin w-full flex justify-center my-3"
-             data-type="standard"
-             data-size="large"
-             data-theme="outline"
-             data-text="sign_in_with"
-             data-shape="rectangular"
-             data-logo_alignment="left"
-             data-width="320">
-        </div>
-        <!-- Kontainer tombol fallback (render programmatic bila auto-render gagal) -->
-        <div id="google-btn-container" class="w-full flex justify-center my-3 hidden"></div>
+        <div id="google-btn-container" class="w-full flex justify-center my-3"></div>
 
         <!-- Disclaimer -->
         <div class="mt-8 text-center text-xs text-[#5F6368] leading-relaxed">
@@ -870,8 +855,8 @@
     }
 
     // ==================== GOOGLE IDENTITY SERVICES (GIS) ====================
-    // Ganti dengan Client ID asli dari Google Cloud Console → APIs & Services → Credentials
-    const GOOGLE_CLIENT_ID = "MASUKKAN_GOOGLE_CLIENT_ID_KAMU_DISINI";
+    // Client ID resmi terdaftar untuk domain https://evitrack.vercel.app
+    const GOOGLE_CLIENT_ID = "98184021321-3tgohufvv3rnk1enn1jidc3efkn7aq63.apps.googleusercontent.com";
 
     // Foto profil sementara (dipakai saat user baru diarahkan ke Register)
     let pendingRegisterPicture = "";
@@ -928,32 +913,30 @@
       navigateView('view-register');
     }
 
-    // Inisialisasi programmatic (fallback bila auto-render .g_id_signin tidak muncul)
-    function initGoogleIdentityFallback() {
-      if (!window.google || !window.google.accounts) return;
-      setTimeout(function () {
-        const autoBtn = document.querySelector('#view-login .g_id_signin iframe');
-        const container = document.getElementById('google-btn-container');
-        if (autoBtn || !container) return;
-        try {
-          google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: handleCredentialResponse
-          });
-          google.accounts.id.renderButton(container, {
+    // Inisialisasi tombol Google Sign-In (official GIS)
+    function initGoogleSignIn() {
+      if (window.google && window.google.accounts) {
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+          auto_select: false
+        });
+        google.accounts.id.renderButton(
+          document.getElementById("google-btn-container"),
+          {
             theme: "outline",
             size: "large",
             width: 320,
             shape: "rectangular",
-            text: "sign_in_with",
-            logo_alignment: "left"
-          });
-          container.classList.remove('hidden');
-        } catch (e) {
-          console.warn("GIS fallback gagal:", e);
-        }
-      }, 1200);
+            text: "signin_with"
+          }
+        );
+        google.accounts.id.prompt();
+      } else {
+        setTimeout(initGoogleSignIn, 300);
+      }
     }
+    window.addEventListener('load', initGoogleSignIn);
 
     // LOGIN DENGAN GOOGLE (BUKA MODAL ACCOUNT PICKER)
     function handleGoogleLogin() {
@@ -1383,9 +1366,6 @@
     window.onload = () => {
       document.getElementById('input-wo-number').value = generateWoNumber();
       renderDashboard();
-
-      // Inisialisasi Google Identity Services (fallback programmatic)
-      initGoogleIdentityFallback();
 
       if (activeSession) {
         applyActiveSession();
