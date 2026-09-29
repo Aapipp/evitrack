@@ -147,7 +147,7 @@
         <p class="text-[#5F6368] text-[15px] mb-3">Sign in with:</p>
 
         <!-- Tombol Login Google (Official Google Identity Services) -->
-        <div id="google-btn-container" class="w-full flex justify-center my-3"></div>
+        <div id="google-signin-btn" class="w-full flex justify-center my-3"></div>
 
         <!-- Disclaimer -->
         <div class="mt-8 text-center text-xs text-[#5F6368] leading-relaxed">
@@ -913,30 +913,36 @@
       navigateView('view-register');
     }
 
-    // Inisialisasi tombol Google Sign-In (official GIS)
-    function initGoogleSignIn() {
-      if (window.google && window.google.accounts) {
+    // Inisialisasi Google Auth (WAJIB tampilkan Account Chooser, tanpa auto-login)
+    function initGoogleAuth() {
+      if (window.google && google.accounts && google.accounts.id) {
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleCredentialResponse,
-          auto_select: false
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          context: "signin"
         });
-        google.accounts.id.renderButton(
-          document.getElementById("google-btn-container"),
-          {
+
+        const container = document.getElementById("google-signin-btn");
+        if (container) {
+          container.innerHTML = "";
+          google.accounts.id.renderButton(container, {
+            type: "standard",
             theme: "outline",
             size: "large",
-            width: 320,
+            text: "signin_with",
             shape: "rectangular",
-            text: "signin_with"
-          }
-        );
-        google.accounts.id.prompt();
+            logo_alignment: "left",
+            width: 320,
+            prompt: "select_account"
+          });
+        }
       } else {
-        setTimeout(initGoogleSignIn, 300);
+        setTimeout(initGoogleAuth, 150);
       }
     }
-    window.addEventListener('load', initGoogleSignIn);
+    window.addEventListener("load", initGoogleAuth);
 
     // LOGIN DENGAN GOOGLE (BUKA MODAL ACCOUNT PICKER)
     function handleGoogleLogin() {
