@@ -337,13 +337,13 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">End (KM)</label>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="adjustKm('input-km-end', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
-              <input type="number" id="input-km-end" value="" oninput="calculateJarak(); clearKmError()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <input type="number" id="input-km-end" value="0" oninput="calculateJarak(); clearKmError()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
               <button type="button" onclick="adjustKm('input-km-end', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
             </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Jarak</label>
-            <input type="text" id="input-km-jarak" value="" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
+            <input type="text" id="input-km-jarak" value="0 KM" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
           </div>
           <div class="flex justify-between pt-3">
             <button type="button" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
@@ -373,7 +373,7 @@
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Alamat</label>
-            <input type="text" id="input-alamat" value="" oninput="clearFieldError('input-alamat','error-alamat')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+            <textarea id="input-alamat" rows="3" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Masukkan alamat titik temuan..." oninput="clearFieldError('input-alamat','error-alamat')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700 resize-none"></textarea>
             <p id="error-alamat" class="text-[10px] text-red-600 mt-1 hidden">Alamat wajib diisi minimal 3 karakter</p>
           </div>
 
@@ -1250,9 +1250,14 @@
     }
 
     function calculateJarak() {
-      const start = parseInt(document.getElementById('input-km-start').value || 0);
-      const end = parseInt(document.getElementById('input-km-end').value || 0);
-      document.getElementById('input-km-jarak').value = Math.max(0, end - start);
+      const readKm = (id) => {
+        const parsed = parseInt(document.getElementById(id).value, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      };
+      const start = readKm('input-km-start');
+      const end = readKm('input-km-end');
+      // Indikator Total Jarak selalu ditampilkan dengan satuan KM (contoh: "12 KM")
+      document.getElementById('input-km-jarak').value = `${Math.max(0, end - start)} KM`;
     }
 
     // ==================== FORM GUARD: VALIDASI WAJIB & ERROR STATE ====================
@@ -1389,10 +1394,12 @@
         document.getElementById('input-whatsapp').value = activeSession.whatsapp || "62822113735";
       }
 
-      // Step 2 (Kilometer): Start KM default 0, End KM & Jarak dikosongkan
-      document.getElementById('input-km-start').value = "0";
-      document.getElementById('input-km-end').value = "";
-      document.getElementById('input-km-jarak').value = "";
+      // Step 2 (Kilometer): Start KM & End KM wajib default "0", indikator Total Jarak "0 KM"
+      const startKmInput = document.getElementById('input-km-start');
+      const endKmInput = document.getElementById('input-km-end');
+      if (startKmInput) startKmInput.value = "0";
+      if (endKmInput) endKmInput.value = "0";
+      calculateJarak(); // -> indikator Total Jarak menjadi "0 KM"
 
       // Step 3 (Temuan): reset foto, alamat, area, section, deskripsi
       const photoInput = document.getElementById('input-photo');
@@ -1452,11 +1459,12 @@
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               currentEvidenceCoords = [lat, lng];
-              reverseGeocodeAddress(lat, lng);
+              // AUTO-FILL ALAMAT DINONAKTIFKAN: koordinat hanya dipakai untuk titik peta.
+              // Kolom Alamat sengaja dibiarkan kosong agar teknisi mengisi manual sesuai titik temuan.
             },
             () => {
               currentEvidenceCoords = [...DEFAULT_COORDS];
-              document.getElementById('input-alamat').value = DEFAULT_ADDRESS;
+              // Fallback alamat default DINONAKTIFKAN agar tidak menimpa isian manual teknisi.
             },
             { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
           );
@@ -1473,7 +1481,9 @@
       return String(Math.floor(100 + Math.random() * 900));
     }
 
-    // Reverse geocoding via OpenStreetMap Nominatim
+    // Reverse geocoding via OpenStreetMap Nominatim.
+    // CATATAN: fungsi ini hanya MENGEMBALIKAN string alamat dan TIDAK menulis apa pun ke
+    // kolom Alamat, sehingga lokasi rumah pengguna tidak pernah menimpa isian manual teknisi.
     async function reverseGeocodeAddress(lat, lng) {
       try {
         const response = await fetch(
@@ -1481,11 +1491,12 @@
         );
         const data = await response.json();
         if (data && data.display_name) {
-          document.getElementById('input-alamat').value = data.display_name;
+          return data.display_name;
         }
       } catch (e) {
-        // Biarkan alamat default bila reverse geocoding gagal
+        // Reverse geocoding gagal -> kembalikan null, kolom Alamat tetap diisi manual
       }
+      return null;
     }
 
     // DISPATCHER PENGIRIMAN EMAIL NOTIFIKASI VERIFIKASI VIA EMAILJS (Duplikat / Reject)
@@ -1808,6 +1819,14 @@
       document.getElementById('input-wo-number').value = generateWoNumber();
       handleAreaChange();
       renderDashboard();
+
+      // Default Kilometer saat inisialisasi pertama: Start & End KM = "0", Total Jarak "0 KM"
+      document.getElementById('input-km-start').value = "0";
+      document.getElementById('input-km-end').value = "0";
+      calculateJarak();
+
+      // Kolom Alamat wajib diawali string kosong (diisi manual oleh teknisi di lapangan)
+      document.getElementById('input-alamat').value = "";
 
       if (activeSession) {
         applyActiveSession();
