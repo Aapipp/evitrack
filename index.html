@@ -782,7 +782,11 @@
 
     // Simpan database tiket ke localStorage (persisten)
     function savePmDatabase() {
-      localStorage.setItem('evitrack_pmDatabase', JSON.stringify(pmDatabase));
+      try {
+        localStorage.setItem('evitrack_pmDatabase', JSON.stringify(pmDatabase));
+      } catch (e) {
+        console.warn("Gagal menyimpan database PM (kuota localStorage penuh):", e);
+      }
     }
 
     // Muat database tiket dari localStorage (fallback ke data seed)
@@ -1597,6 +1601,18 @@
 
       const coords = currentEvidenceCoords ? [...currentEvidenceCoords] : [...DEFAULT_COORDS];
 
+      // Baca foto evidence sebagai Base64 Data URL agar tersimpan utuh di objek tiket
+      const photoInputEl = document.getElementById('input-photo');
+      let evidencePhoto = '';
+      if (photoInputEl && photoInputEl.files && photoInputEl.files[0]) {
+        evidencePhoto = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(photoInputEl.files[0]);
+        });
+      }
+
       // Hitung Hash SHA-256 dari string evidence di latar belakang
       const rawString = `${detectedIndexNumber}_${alamat}_${deskripsi}`;
       const generatedHash = await computeSHA256(rawString);
@@ -1647,6 +1663,7 @@
         address: alamat,
         coords: coords,
         deskripsi: deskripsi,
+        photo: evidencePhoto,
         status: status,
         rejectionReason: rejectionReason
       };
@@ -1749,9 +1766,12 @@
         const woColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-gray-500');
         // Result: teks status murni tanpa pill tebal
         const resultColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-orange-500');
-        // Photo: thumbnail evidence (fallback online bila belum tersimpan)
-        const photoSrc = item.photoUrl || item.photo || item.evidencePhoto
-          || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(item.indexNumber || 'PM') + '&background=90CAF9&color=ffffff&size=64');
+        // Photo: thumbnail evidence asli (Base64 / URL) atau placeholder netral bila kosong
+        const photoSrc = item.photo || item.photoUrl || item.image || item.evidenceImage || item.evidencePhoto || item.foto || '';
+        const hasPhoto = !!photoSrc && (/^data:image\//i.test(photoSrc) || /^https?:\/\//i.test(photoSrc));
+        const photoCell = hasPhoto
+          ? `<img src="${photoSrc}" alt="Evidence" class="w-10 h-10 object-cover rounded-md border border-gray-300 shadow-sm cursor-pointer">`
+          : `<div class="w-10 h-10 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400"><i class="fa-solid fa-image text-sm"></i></div>`;
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-gray-50";
@@ -1759,7 +1779,7 @@
           <td class="py-2.5 pr-2 font-semibold font-mono"><a href="#" class="${woColor} underline decoration-dotted">${item.woNumber}</a></td>
           <td class="py-2.5 pr-2 text-gray-500 whitespace-nowrap">${formatRelativeTime(item.date)}</td>
           <td class="py-2.5 pr-2 font-medium ${resultColor}">${item.status}</td>
-          <td class="py-2.5"><img src="${photoSrc}" alt="Evidence" class="w-9 h-9 object-cover rounded border border-gray-200"></td>
+          <td class="py-2.5">${photoCell}</td>
         `;
         tbody.appendChild(tr);
       });
