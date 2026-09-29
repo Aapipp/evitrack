@@ -1005,28 +1005,40 @@
       const userEmail = payload.email;
       const userName = payload.name;
       const userPicture = payload.picture;
+      const userSub = payload.sub;
 
       if (!userEmail) {
-        alert("Gagal membaca akun Google.");
+        console.warn("Gagal membaca akun Google.");
         return;
       }
 
       const trimmedEmail = userEmail.toLowerCase();
-      const existing = userAccounts.find(a => a.email.toLowerCase() === trimmedEmail);
+      let existing = userAccounts.find(a => a.email.toLowerCase() === trimmedEmail);
 
       if (existing) {
-        // Sinkronkan nama & foto profil terbaru dari Google
+        // Sinkronkan nama, foto, dan Google subject terbaru
         if (userName) existing.name = userName;
         if (userPicture) existing.picture = userPicture;
+        if (userSub) existing.sub = userSub;
         saveUserAccounts();
-
-        activeSession = existing;
-        saveActiveSession();
-        applyActiveSession();
-        navigateView('view-home');
       } else {
-        openRegisterForGoogle(trimmedEmail, userName, userPicture);
+        // AUTO-PROVISIONING: buat profil akun baru otomatis tanpa registrasi manual
+        existing = {
+          email: trimmedEmail,
+          name: userName || trimmedEmail.split('@')[0],
+          whatsapp: "",
+          gender: "Laki-laki",
+          picture: userPicture || "",
+          sub: userSub || ""
+        };
+        userAccounts.push(existing);
+        saveUserAccounts();
       }
+
+      activeSession = existing;
+      saveActiveSession();
+      applyActiveSession();
+      navigateView('view-home');
     }
 
     function openRegisterForGoogle(email, name, picture) {
@@ -1477,19 +1489,21 @@
         };
         imageProbe.src = URL.createObjectURL(file);
 
-        // Auto-detect lokasi perangkat + reverse geocoding
+        // OTOMASI ALAMAT: isi default valid segera agar kolom tidak pernah kosong
+        fillDefaultAddress();
+
+        // Auto-detect lokasi perangkat + reverse geocoding → perbarui alamat titik temuan
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
-            (position) => {
+            async (position) => {
               const lat = position.coords.latitude;
               const lng = position.coords.longitude;
               currentEvidenceCoords = [lat, lng];
-              // AUTO-FILL ALAMAT DINONAKTIFKAN: koordinat hanya dipakai untuk titik peta.
-              // Kolom Alamat sengaja dibiarkan kosong agar teknisi mengisi manual sesuai titik temuan.
+              const address = await reverseGeocodeAddress(lat, lng);
+              updateAddressIfNotEdited(address);
             },
             () => {
               currentEvidenceCoords = [...DEFAULT_COORDS];
-              // Fallback alamat default DINONAKTIFKAN agar tidak menimpa isian manual teknisi.
             },
             { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
           );
@@ -1522,6 +1536,42 @@
         // Reverse geocoding gagal -> kembalikan null, kolom Alamat tetap diisi manual
       }
       return null;
+    }
+
+    // Teks alamat default valid berdasarkan pilihan Area/Section aktif.
+    function buildDefaultAddress() {
+      const areaSelect = document.getElementById('input-area');
+      const sectionSelect = document.getElementById('input-section');
+      const area = (areaSelect && areaSelect.value) || 'Daop I Jakarta';
+      const section = (sectionSelect && sectionSelect.value) || '';
+      let addr = `Jl. Lintas Jalur KA - ${area}`;
+      if (section) addr += ` (${section})`;
+      return addr;
+    }
+
+    // Isi kolom Alamat dengan teks default bila masih kosong.
+    function fillDefaultAddress() {
+      const alamatInput = document.getElementById('input-alamat');
+      if (!alamatInput) return;
+      if (!alamatInput.value.trim()) {
+        alamatInput.value = buildDefaultAddress();
+        clearFieldError('input-alamat', 'error-alamat');
+      }
+    }
+
+    // Perbarui alamat dari hasil reverse-geocoding, hanya bila belum diedit manual oleh teknisi.
+    function updateAddressIfNotEdited(address) {
+      const alamatInput = document.getElementById('input-alamat');
+      if (!alamatInput) return;
+      const current = alamatInput.value.trim();
+      const defaultVal = buildDefaultAddress();
+      if (current && current !== defaultVal) return; // sudah diedit manual, jangan timpa
+      if (address && address.trim().length >= 3) {
+        alamatInput.value = address;
+      } else if (!current) {
+        alamatInput.value = defaultVal;
+      }
+      clearFieldError('input-alamat', 'error-alamat');
     }
 
     // DISPATCHER PENGIRIMAN EMAIL NOTIFIKASI VERIFIKASI VIA EMAILJS (Duplikat / Reject)
