@@ -532,21 +532,6 @@
       </div>
     </div>
 
-    <!-- 6. MODAL WHATSAPP GATEWAY NOTIFICATION (Skripsi Hal 48) -->
-    <div id="modal-wa-alert" class="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
-      <div class="bg-white w-full max-w-xs rounded-none p-4 shadow-2xl space-y-3 border-t-4 border-red-500 animate-scale">
-        <div class="flex items-center space-x-2 text-red-600">
-          <i class="fa-brands fa-whatsapp text-2xl text-green-500"></i>
-          <h4 class="font-bold text-sm">Peringatan Foto Duplikat!</h4>
-        </div>
-        <div class="bg-gray-100 p-2.5 rounded-none text-xs text-gray-800 font-mono leading-relaxed border" id="wa-alert-message">
-          <!-- Text Dinamis Fonnte API -->
-        </div>
-        <p class="text-[10px] text-gray-500 italic text-center">Terkirim otomatis via Fonnte WhatsApp Gateway</p>
-        <button onclick="closeWaAlert()" class="w-full py-2 bg-[#1E88E5] text-white text-xs font-bold rounded-none shadow hover:bg-blue-600">Mengerti</button>
-      </div>
-    </div>
-
     <!-- 7. MODAL ABOUT (Buku Panduan Hal 8) -->
     <div id="modal-about" class="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
       <div class="bg-white w-full max-w-xs rounded-none p-4 shadow-2xl space-y-3 text-center">
@@ -1343,6 +1328,48 @@
       }
     }
 
+    // KIRIM EMAIL NOTIFIKASI DUPLIKASI OTOMATIS (Tanpa pop-up alert)
+    async function sendDuplicateNotificationEmail(newTicket, matchedTicket) {
+      const userSession = JSON.parse(localStorage.getItem('evitrack_activeSession') || '{}');
+      const recipientEmail = userSession.email || userSession.userEmail;
+      const recipientName = userSession.name || userSession.userName || "Teknisi";
+
+      if (!recipientEmail) return;
+
+      const emailSubject = `Gambar terdeteksi Duplikat - WO Number ${newTicket.woNumber}`;
+      const emailBody = `Yth. ${recipientName}\nPerihal: Pemberitahuan Duplikasi Gambar\n\nDengan hormat,\n\nGambar yang Anda unggah dengan WO Number ${newTicket.woNumber} terdeteksi memiliki kemiripan dengan gambar dari WO Number lain berdasarkan hasil verifikasi sistem.\n\nBerikut adalah daftar gambar yang terindikasi duplikat:\n\nGambar Duplikat untuk WO Number ${newTicket.woNumber}\n\nWO Number: ${matchedTicket ? matchedTicket.woNumber : 'PM-20260805-067'}\n\nKami mohon untuk meninjau kembali pengunggahan tersebut. Untuk informasi lebih lanjut, silakan hubungi administrator sistem.\n\nHormat kami,\nTim Verifikasi Data (prasetiyoafif61@gmail.com)`;
+
+      // 1. Catat ke Outbox lokal agar selalu bisa diverifikasi pengirimannya
+      const outbox = JSON.parse(localStorage.getItem('evitrack_outboxEmails') || '[]');
+      outbox.push({
+        from: "prasetiyoafif61@gmail.com",
+        to: recipientEmail,
+        subject: emailSubject,
+        body: emailBody,
+        timestamp: new Date().toLocaleString('id-ID')
+      });
+      localStorage.setItem('evitrack_outboxEmails', JSON.stringify(outbox));
+
+      // 2. Kirim via Web3Forms API endpoint (atau layanan webhook email)
+      try {
+        fetch("https://api.web3forms.com/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify({
+            access_key: "c25c6ef4-9e3f-4e0d-bbf7-9d7a9ef3878b", // Public key atau fallback service
+            from_name: "EviTrack System <prasetiyoafif61@gmail.com>",
+            replyto: "prasetiyoafif61@gmail.com",
+            to: recipientEmail,
+            subject: emailSubject,
+            message: emailBody
+          })
+        }).then(res => console.log("[Email Sent]", res.status))
+          .catch(err => console.log("[Email Logged Locally]", err));
+      } catch (e) {
+        console.warn("Email dispatcher fallback active");
+      }
+    }
+
     // SUBMIT DAN LOGIKA DETEKSI DUPLIKASI SILUMAN (INDEX NUMBER DI LATAR BELAKANG)
     async function submitPreventiveMaintenance() {
       const woNumber = document.getElementById('input-wo-number').value;
@@ -1382,15 +1409,17 @@
       };
 
       if (existingMatch) {
-        // TERDETEKSI DUPLIKAT!
+        // TERDETEKSI DUPLIKAT! Simpan record, kirim email notifikasi, lalu kembali ke Home tanpa pop-up
         const newRecord = { ...baseRecord, status: "Duplikat" };
         pmDatabase.unshift(newRecord);
         savePmDatabase();
 
-        // Notifikasi simulasi Fonnte WhatsApp Gateway
-        const messageText = `Yth. ${userName}, Mohon Maaf! Gambar yang Anda unggah dengan WO Number ${woNumber} memiliki kesamaan dengan gambar lain. Data yang serupa ditemukan pada WO Number berikut: ${existingMatch.woNumber}. Silakan periksa email Anda untuk informasi lebih lanjut.`;
-        document.getElementById('wa-alert-message').textContent = messageText;
-        document.getElementById('modal-wa-alert').classList.remove('hidden');
+        // Kirim notifikasi email duplikasi otomatis ke email pengguna yang sedang login
+        sendDuplicateNotificationEmail(newRecord, existingMatch);
+
+        // Reset form Create PM & langsung pindah ke Beranda secara mulus (tanpa alert)
+        resetCreatePMForm();
+        navigateView('view-home');
       } else {
         // UNIK & VALID
         const newRecord = { ...baseRecord, status: "Approved" };
@@ -1532,11 +1561,6 @@
     }
     function closeSyncModal() {
       document.getElementById('modal-sync').classList.add('hidden');
-    }
-
-    function closeWaAlert() {
-      document.getElementById('modal-wa-alert').classList.add('hidden');
-      navigateView('view-dashboard');
     }
 
     function openAboutModal() {
