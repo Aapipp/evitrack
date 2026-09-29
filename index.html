@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>EviTrack - Kopindosat</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* Palet Warna Persis AppSheet Kopindosat */
+    :root {
+      --app-blue-header: #1E88E5;
+      --app-blue-dark: #1565C0;
+      --app-blue-accent: #0086CE;
+      --app-cyan-banner: #00A8B5;
+      --app-bg: #F4F6F9;
+      --app-approved: #0288D1;
+      --app-rejected: #E53935;
+    }
+    body {
+      background-color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    @keyframes evi-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spin-slow {
+      animation: evi-spin 10s linear infinite;
+      transform-origin: center;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body class="flex justify-center items-center min-h-screen sm:p-4">
+
+  <!-- Mobile Frame Container (Ukuran AppSheet Mobile Display) -->
+  <div class="w-full max-w-md bg-[#F4F6F9] h-[100vh] sm:h-[844px] flex flex-col relative overflow-hidden sm:rounded-none sm:shadow-2xl border border-gray-300">
+
+    <!-- 1. TOP HEADER APP BAR (Buku Panduan Hal 3) -->
+    <header id="top-header" class="bg-[#1E88E5] text-white px-4 py-3 flex items-center justify-between shadow-md z-30 select-none hidden">
+      <div class="flex items-center space-x-3">
+        <button onclick="toggleSidebar()" class="text-white hover:text-gray-200 focus:outline-none">
+          <i class="fa-solid fa-bars text-xl"></i>
+        </button>
+        <!-- Logo Bintang Oranye-Kuning Khas EviTrack -->
+        <div class="w-7 h-7 flex items-center justify-center bg-white rounded-full p-1 shadow-inner">
+          <i class="fa-solid fa-snowflake text-amber-500 text-lg"></i>
+        </div>
+        <h1 id="app-bar-title" class="font-semibold text-lg tracking-wide">Home</h1>
+      </div>
+      <div class="flex items-center space-x-3">
+        <button onclick="searchAction()" class="hover:text-gray-200">
+          <i class="fa-solid fa-magnifying-glass text-lg"></i>
+        </button>
+        <!-- Tombol Sinkronisasi Data (Buku Panduan Hal 7) -->
+        <button onclick="triggerSyncModal()" class="hover:text-gray-200">
+          <i id="sync-icon" class="fa-solid fa-rotate text-lg"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. SIDEBAR DRAWER (Buku Panduan Hal 8) -->
+    <div id="sidebar-drawer" class="absolute top-0 left-0 w-3/4 h-full bg-white z-50 transform -translate-x-full transition-transform duration-300 ease-in-out shadow-2xl flex flex-col justify-between">
+      <div>
+        <div class="bg-[#1E88E5] p-5 text-white flex items-center space-x-3">
+          <div class="w-8 h-8 flex items-center justify-center bg-white rounded-full p-1 shadow-inner">
+            <i class="fa-solid fa-snowflake text-amber-500 text-xl"></i>
+          </div>
+          <div>
+            <h2 class="font-bold text-lg leading-tight">EviTrack</h2>
+            <p class="text-xs text-blue-100">Kopindosat MS OSP</p>
+          </div>
+        </div>
+        <nav class="p-3 space-y-1 text-gray-700 font-medium">
+          <button onclick="navigateView('view-home'); toggleSidebar();" class="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 flex items-center space-x-3">
+            <i class="fa-solid fa-house text-[#1E88E5] w-5"></i><span>Home</span>
+          </button>
+          <button onclick="navigateView('view-create-pm'); toggleSidebar();" class="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 flex items-center space-x-3">
+            <i class="fa-solid fa-camera text-[#1E88E5] w-5"></i><span>Create PM</span>
+          </button>
+          <button onclick="navigateView('view-location'); toggleSidebar();" class="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 flex items-center space-x-3">
+            <i class="fa-solid fa-paper-plane text-[#1E88E5] w-5"></i><span>Location</span>
+          </button>
+          <button onclick="navigateView('view-pm-list'); toggleSidebar();" class="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 flex items-center space-x-3">
+            <i class="fa-solid fa-bars-staggered text-[#1E88E5] w-5"></i><span>Preventive Maintenance (PM)</span>
+          </button>
+          <button onclick="openAboutModal(); toggleSidebar();" class="w-full text-left px-3 py-2.5 rounded-none hover:bg-blue-50 flex items-center space-x-3">
+            <i class="fa-solid fa-circle-info text-[#1E88E5] w-5"></i><span>About</span>
+          </button>
+        </nav>
+      </div>
+      <div class="p-4 border-t border-gray-200">
+        <button onclick="logoutAction()" class="w-full text-left px-3 py-2 text-red-600 font-semibold flex items-center space-x-3">
+          <i class="fa-solid fa-right-from-bracket w-5"></i><span>Log Out</span>
+        </button>
+      </div>
+    </div>
+    <div id="drawer-overlay" onclick="toggleSidebar()" class="absolute inset-0 bg-black/40 z-40 hidden"></div>
+
+    <!-- 3. MAIN DYNAMIC VIEW CONTAINER -->
+    <main class="flex-1 overflow-y-auto custom-scrollbar relative">
+
+      <!-- ==================== VIEW LOGIN: SIGN IN WITH GOOGLE ==================== -->
+      <section id="view-login" class="h-full flex flex-col justify-center px-8">
+        <!-- Header Brand: Logo Bunga Kelopak Oranye-Merah + Teks EviTrack -->
+        <div class="flex items-center space-x-4 mb-10">
+          <div class="shrink-0">
+            <svg class="w-11 h-11 spin-slow" viewBox="0 0 48 48">
+              <defs>
+                <linearGradient id="evi-petal" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#F9A825"/>
+                  <stop offset="55%" stop-color="#FB8C00"/>
+                  <stop offset="100%" stop-color="#E53935"/>
+                </linearGradient>
+              </defs>
+              <g fill="url(#evi-petal)">
+                <ellipse cx="24" cy="9.5" rx="6" ry="9"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(45 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(90 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(135 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(180 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(225 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(270 24 24)"/>
+                <ellipse cx="24" cy="9.5" rx="6" ry="9" transform="rotate(315 24 24)"/>
+              </g>
+              <circle cx="24" cy="24" r="4.5" fill="#FFC107"/>
+              <circle cx="24" cy="24" r="2" fill="#FFF3E0"/>
+            </svg>
+          </div>
+          <h1 class="text-[26px] font-semibold text-[#1F2937] leading-none">EviTrack</h1>
+          <img id="login-extra-logo" src="" class="hidden h-8 object-contain ml-2">
+        </div>
+
+        <!-- Teks Panduan -->
+        <p class="text-[#5F6368] text-[15px] mb-3">Sign in with:</p>
+
+        <!-- Tombol Login Google (Official Google Identity Services) -->
+        <div id="g_id_onload"
+             data-client_id="MASUKKAN_GOOGLE_CLIENT_ID_KAMU_DISINI"
+             data-callback="handleCredentialResponse"
+             data-auto_prompt="false">
+        </div>
+        <div class="g_id_signin w-full flex justify-center my-3"
+             data-type="standard"
+             data-size="large"
+             data-theme="outline"
+             data-text="sign_in_with"
+             data-shape="rectangular"
+             data-logo_alignment="left"
+             data-width="320">
+        </div>
+        <!-- Kontainer tombol fallback (render programmatic bila auto-render gagal) -->
+        <div id="google-btn-container" class="w-full flex justify-center my-3 hidden"></div>
+
+        <!-- Disclaimer -->
+        <div class="mt-8 text-center text-xs text-[#5F6368] leading-relaxed">
+          <p>By signing in, you agree to the</p>
+          <p><a href="#" class="text-[#1A73E8] font-medium">terms of service</a> and <a href="#" class="text-[#1A73E8] font-medium">privacy policy</a>.</p>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW REGISTER: FORM PENDAFTARAN ==================== -->
+      <section id="view-register" class="h-full flex flex-col hidden">
+        <!-- Header Form Register -->
+        <div class="bg-[#1E88E5] text-white px-4 py-3 flex items-center justify-between shadow-md select-none shrink-0">
+          <div class="flex items-center space-x-3">
+            <button type="button" class="text-white hover:text-gray-200 focus:outline-none">
+              <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+            <div class="w-7 h-7 flex items-center justify-center bg-white rounded-full p-1 shadow-inner">
+              <i class="fa-solid fa-snowflake text-amber-500 text-lg"></i>
+            </div>
+            <h1 class="font-semibold text-lg tracking-wide">Register</h1>
+          </div>
+          <button type="button" onclick="resetRegisterForm()" class="text-white hover:text-gray-200 focus:outline-none">
+            <i class="fa-solid fa-rotate text-lg"></i>
+          </button>
+        </div>
+
+        <!-- Body Form Register -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+          <div class="bg-white p-4 rounded-none shadow-sm border border-gray-200 space-y-4">
+            <!-- Email -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Email <span class="text-[#1E88E5] font-bold">*</span></label>
+              <input type="email" id="register-email" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm text-gray-700">
+            </div>
+            <!-- Nama Pengguna -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Nama Pengguna</label>
+              <input type="text" id="register-name" placeholder="Masukkan nama lengkap" class="w-full border border-gray-300 rounded-none px-3 py-2 text-sm text-gray-700">
+            </div>
+            <!-- Jenis Kelamin -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Jenis Kelamin</label>
+              <div class="grid grid-cols-2 border border-gray-300 rounded-none overflow-hidden">
+                <button type="button" id="gender-laki" onclick="selectGender('Laki-laki')" class="py-2 text-sm font-medium bg-[#1E88E5] text-white">Laki-laki</button>
+                <button type="button" id="gender-perempuan" onclick="selectGender('Perempuan')" class="py-2 text-sm font-medium bg-gray-100 text-gray-600">Perempuan</button>
+              </div>
+            </div>
+            <!-- WhatsApp -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">WhatsApp <span class="text-[#1E88E5] font-bold">*</span></label>
+              <input type="text" id="register-whatsapp" placeholder="62822..." class="w-full border border-gray-300 rounded-none px-3 py-2 text-sm font-mono text-gray-700">
+            </div>
+            <!-- Tanggal Daftar -->
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Tanggal Daftar</label>
+              <div class="relative">
+                <input type="text" id="register-date" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-mono text-gray-700 pr-10">
+                <i class="fa-solid fa-calendar absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Form Register -->
+          <div class="flex justify-between items-center">
+            <button type="button" onclick="cancelRegister()" class="px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-100 rounded-none">Cancel</button>
+            <button type="button" onclick="saveRegister()" class="px-5 py-2 text-sm font-bold text-[#1E88E5] hover:bg-blue-50 rounded-none">Save</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 1: HOME (Buku Panduan Hal 3) ==================== -->
+      <section id="view-home" class="p-4 space-y-4 hidden">
+        <!-- User Info Badge Card -->
+        <div class="bg-white p-3 rounded-none shadow-sm border border-gray-100 flex items-center space-x-3">
+          <img id="home-user-photo" src="" alt="Foto Profil" class="w-12 h-12 rounded-full object-cover hidden">
+          <div id="home-user-initial" class="w-12 h-12 rounded-full bg-[#1E88E5] text-white flex items-center justify-center text-xl font-bold">
+            A
+          </div>
+          <div>
+            <h2 id="home-user-name" class="text-base font-bold text-gray-800">Apip</h2>
+            <p class="text-xs text-gray-500">Anda login sebagai user</p>
+          </div>
+        </div>
+
+        <!-- Banner Foto/Gambar Kustom (Slot Gambar) -->
+        <div class="rounded-none overflow-hidden border border-gray-300 bg-white shadow-sm">
+          <img id="banner-image" src="banner.png" alt="Banner EviTrack" class="w-full h-auto object-cover block">
+        </div>
+
+        <!-- 3 Kartu Menu Aksi Utama -->
+        <div class="space-y-3 pt-1">
+          <!-- Card 1: Create PM -->
+          <div onclick="navigateView('view-create-pm')" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 hover:border-[#1E88E5] cursor-pointer flex items-center space-x-4 transition">
+            <div class="w-12 h-12 rounded-none bg-blue-50 text-[#1E88E5] flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-camera"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-800 text-sm">Create PM</h4>
+              <p class="text-xs text-gray-500">Menu ini berfungsi untuk membuat PM</p>
+            </div>
+          </div>
+
+          <!-- Card 2: Location -->
+          <div onclick="navigateView('view-location')" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 hover:border-[#1E88E5] cursor-pointer flex items-center space-x-4 transition">
+            <div class="w-12 h-12 rounded-none bg-blue-50 text-[#1E88E5] flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-paper-plane"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-800 text-sm">Location</h4>
+              <p class="text-xs text-gray-500">Menu ini menampilkan location berdasarkan dasar yang sudah di upload</p>
+            </div>
+          </div>
+
+          <!-- Card 3: Preventive Maintenance (PM) -->
+          <div onclick="navigateView('view-pm-list')" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 hover:border-[#1E88E5] cursor-pointer flex items-center space-x-4 transition">
+            <div class="w-12 h-12 rounded-none bg-blue-50 text-[#1E88E5] flex items-center justify-center text-2xl">
+              <i class="fa-solid fa-bars-staggered"></i>
+            </div>
+            <div>
+              <h4 class="font-bold text-gray-800 text-sm">Preventive Maintenance (PM)</h4>
+              <p class="text-xs text-gray-500">Menu ini berfungsi untuk PM</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 2: CREATE PM FORM 3 STEP (Buku Panduan Hal 4) ==================== -->
+      <section id="view-create-pm" class="p-4 space-y-4 hidden">
+        <!-- Wizard Stepper Tab Header -->
+        <div class="flex items-center justify-between px-2 py-1 bg-white rounded-none border border-gray-200 text-xs font-semibold text-gray-500">
+          <div id="step-tab-1" class="flex items-center space-x-1 text-[#1E88E5]">
+            <span class="w-5 h-5 rounded-full bg-[#1E88E5] text-white flex items-center justify-center text-[10px]">1</span>
+            <span>Identitas</span>
+          </div>
+          <span class="text-gray-300">―</span>
+          <div id="step-tab-2" class="flex items-center space-x-1">
+            <span class="w-5 h-5 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-[10px]">2</span>
+            <span>Kilometer</span>
+          </div>
+          <span class="text-gray-300">―</span>
+          <div id="step-tab-3" class="flex items-center space-x-1">
+            <span class="w-5 h-5 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-[10px]">3</span>
+            <span>Temuan</span>
+          </div>
+        </div>
+
+        <!-- STEP 1: IDENTITAS -->
+        <div id="form-step-1" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 space-y-3">
+          <h3 class="font-bold text-gray-800 border-b pb-2 text-sm">Identitas</h3>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">WO Number *</label>
+            <input type="text" id="input-wo-number" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-mono font-bold text-gray-700">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Nama Pengguna</label>
+            <input type="text" id="input-user-name" value="Apip" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm text-gray-700">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">WhatsApp *</label>
+            <input type="text" id="input-whatsapp" value="62822113735" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-mono text-gray-700">
+          </div>
+          <div class="flex justify-between pt-3">
+            <button type="button" onclick="navigateView('view-home')" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Cancel</button>
+            <button type="button" onclick="goToStep(2)" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: KILOMETER -->
+        <div id="form-step-2" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 space-y-3 hidden">
+          <h3 class="font-bold text-gray-800 border-b pb-2 text-sm">Kilometer</h3>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Start (KM)</label>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="adjustKm('input-km-start', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
+              <input type="number" id="input-km-start" value="85" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <button type="button" onclick="adjustKm('input-km-start', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">End (KM)</label>
+            <div class="flex items-center space-x-2">
+              <button type="button" onclick="adjustKm('input-km-end', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
+              <input type="number" id="input-km-end" value="96" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <button type="button" onclick="adjustKm('input-km-end', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Jarak</label>
+            <input type="text" id="input-km-jarak" value="11" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
+          </div>
+          <div class="flex justify-between pt-3">
+            <button type="button" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
+            <div class="space-x-2">
+              <button type="button" onclick="navigateView('view-home')" class="px-3 py-2 text-xs font-medium text-gray-600 rounded-none">Cancel</button>
+              <button type="button" onclick="goToStep(3)" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3: TEMUAN & VERIFIKASI (KUNCI INDEX NUMBER & SHA-256) -->
+        <div id="form-step-3" class="bg-white p-4 rounded-none shadow-sm border border-gray-200 space-y-3 hidden">
+          <h3 class="font-bold text-gray-800 border-b pb-2 text-sm">Temuan</h3>
+          
+          <!-- Box Upload Foto Evidence -->
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Upload Foto * (Wajib Timestamp SOP)</label>
+            <div onclick="document.getElementById('input-photo').click()" class="border-2 border-dashed border-gray-300 hover:border-[#1E88E5] rounded-none p-4 text-center cursor-pointer bg-gray-50 flex flex-col items-center justify-center">
+              <i class="fa-solid fa-camera text-3xl text-gray-400 mb-1"></i>
+              <span id="photo-label" class="text-xs text-gray-500 font-medium">Klik untuk ambil/unggah foto</span>
+              <img id="photo-preview" class="mt-2 max-h-36 rounded-none shadow hidden object-contain">
+            </div>
+            <input type="file" id="input-photo" accept="image/*" class="hidden" onchange="handleImageSelection(event)">
+          </div>
+
+          <!-- KUNCI INTI: Index Number & OCR Simulator -->
+          <div class="bg-blue-50 p-3 rounded-none border border-blue-200">
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs font-bold text-blue-900">Index Number (Hasil Ekstraksi OCR) *</label>
+              <span class="text-[10px] bg-[#1E88E5] text-white px-2 py-0.5 rounded-none font-mono">Core Key</span>
+            </div>
+            <input type="number" id="input-index-number" placeholder="Contoh: 432 atau 256" class="w-full border border-blue-300 rounded-none px-3 py-1.5 text-sm font-mono font-bold bg-white text-gray-800">
+            <p class="text-[10px] text-blue-700 mt-1 leading-tight">Index Number unik dibaca dari watermark foto. Jika sama dengan foto terdahulu, sistem akan menolak (Duplikat).</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Alamat / Lokasi Temuan</label>
+            <input type="text" id="input-alamat" value="Jl. Sadar Raya, Ciganjur, Kec. Jagakarsa, Kota Jakarta Selatan" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Area / Daop</label>
+            <select id="input-area" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs bg-white text-gray-700">
+              <option value="Daop I Jakarta">Daop I Jakarta</option>
+              <option value="Daop II Bandung">Daop II Bandung</option>
+              <option value="Daop IV Semarang">Daop IV Semarang</option>
+              <option value="Daop V Purwokerto">Daop V Purwokerto</option>
+              <option value="Daop VIII Surabaya">Daop VIII Surabaya</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Deskripsi Temuan</label>
+            <input type="text" id="input-deskripsi" value="Kabel terkelupas" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+          </div>
+
+          <div class="flex justify-between pt-3">
+            <button type="button" onclick="goToStep(2)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
+            <div class="space-x-2">
+              <button type="button" onclick="navigateView('view-home')" class="px-3 py-2 text-xs font-medium text-gray-600 rounded-none">Cancel</button>
+              <button type="button" onclick="submitPreventiveMaintenance()" class="px-6 py-2 text-xs font-bold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600 flex items-center space-x-1">
+                <span>Save</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 3: LOCATION (Buku Panduan Hal 5) ==================== -->
+      <section id="view-location" class="h-full flex flex-col hidden relative">
+        <div id="map-container" class="w-full flex-1 z-0"></div>
+        <!-- Card Detail Marker Bawah -->
+        <div class="absolute bottom-4 left-4 right-4 bg-white p-3 rounded-none shadow-lg border border-gray-200 z-10">
+          <div class="flex items-start space-x-3">
+            <div class="w-12 h-12 rounded-none bg-gray-200 overflow-hidden shrink-0 border">
+              <img src="https://images.unsplash.com/photo-1544717305-2782549b5136?w=150" class="w-full h-full object-cover">
+            </div>
+            <div class="flex-1 min-w-0">
+              <h4 id="loc-wo" class="text-xs font-bold text-gray-800">PM-20260802-066</h4>
+              <p id="loc-user" class="text-[11px] text-gray-500">Apip • Daop I Jakarta</p>
+              <p id="loc-addr" class="text-[10px] text-gray-600 truncate mt-0.5">Jl. Sadar Raya, Ciganjur, Kec. Jagakarsa...</p>
+            </div>
+          </div>
+          <!-- Shortcut Icons: Telepon, Chat, Email, Gmaps -->
+          <div class="flex justify-around items-center pt-2 mt-2 border-t text-gray-600 text-sm">
+            <a href="tel:62822113735" class="hover:text-blue-600"><i class="fa-solid fa-phone"></i></a>
+            <a href="https://wa.me/62822113735" target="_blank" class="hover:text-green-600"><i class="fa-brands fa-whatsapp"></i></a>
+            <a href="mailto:admin@kopindosat.co.id" class="hover:text-blue-500"><i class="fa-solid fa-envelope"></i></a>
+            <a href="https://maps.google.com" target="_blank" class="hover:text-red-500"><i class="fa-solid fa-location-arrow"></i></a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 4: DASHBOARD (Buku Panduan Hal 6) ==================== -->
+      <section id="view-dashboard" class="p-4 space-y-4 hidden">
+        <!-- Info Account Card (Gradient CSS) -->
+        <div class="rounded-none p-4 text-white shadow-md relative overflow-hidden" style="background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-bold text-sm tracking-wide">Info Account</h3>
+            <span id="dash-date" class="text-[10px] opacity-80">Wednesday, 30/09/2026</span>
+          </div>
+          <div class="flex items-center space-x-3 mb-3">
+            <img id="dash-user-photo" src="" alt="Foto Profil" class="w-10 h-10 rounded-full object-cover hidden">
+            <div id="dash-user-initial" class="w-10 h-10 rounded-full bg-white text-[#1E88E5] flex items-center justify-center font-bold">
+              A
+            </div>
+            <div>
+              <h4 id="dash-user-name" class="font-bold text-sm leading-tight">Hai, Apip</h4>
+              <p class="text-[11px] text-blue-100">Anda login sebagai User</p>
+            </div>
+          </div>
+
+          <!-- Counter Information Badges (Total PM, Duplikat, Approved) -->
+          <div class="grid grid-cols-3 gap-2 text-center text-gray-800">
+            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
+              <span class="text-[10px] font-bold block text-gray-500">PM</span>
+              <span id="stat-total" class="text-base font-extrabold text-[#1E88E5]">6</span>
+            </div>
+            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
+              <span class="text-[10px] font-bold block text-red-500">Rejected</span>
+              <span id="stat-rejected" class="text-base font-extrabold text-[#E53935]">2</span>
+            </div>
+            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
+              <span class="text-[10px] font-bold block text-blue-600">Approved</span>
+              <span id="stat-approved" class="text-base font-extrabold text-[#0288D1]">4</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabel Recapitulation List -->
+        <div class="bg-white rounded-none shadow-sm border border-gray-200 p-3">
+          <div class="flex justify-between items-center mb-2 pb-1 border-b">
+            <h4 class="font-bold text-xs text-gray-700">Recapitulation</h4>
+            <span class="text-[10px] text-gray-400">Terbaru</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-[11px]">
+              <thead>
+                <tr class="text-gray-400 border-b">
+                  <th class="pb-1 font-semibold">WO Number</th>
+                  <th class="pb-1 font-semibold">Date</th>
+                  <th class="pb-1 font-semibold">Result</th>
+                </tr>
+              </thead>
+              <tbody id="recap-table-body" class="divide-y divide-gray-100">
+                <!-- Di-render dinamis oleh JavaScript -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== VIEW 5: LIST PREVENTIVE MAINTENANCE ==================== -->
+      <section id="view-pm-list" class="p-4 space-y-3 hidden">
+        <h3 class="font-bold text-sm text-gray-800">Daftar Preventive Maintenance</h3>
+        <div id="pm-card-container" class="space-y-2.5">
+          <!-- Di-render dinamis oleh JavaScript -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 4. BOTTOM NAVIGATION BAR (Buku Panduan Hal 3 & 6) -->
+    <footer id="bottom-nav" class="bg-white border-t border-gray-200 flex justify-around py-2 shadow-lg z-30 select-none hidden">
+      <button onclick="navigateView('view-home')" id="nav-btn-home" class="flex flex-col items-center text-[#1E88E5] focus:outline-none">
+        <i class="fa-solid fa-house text-lg"></i>
+        <span class="text-[10px] font-semibold mt-0.5">Home</span>
+      </button>
+      <button onclick="navigateView('view-dashboard')" id="nav-btn-dashboard" class="flex flex-col items-center text-gray-400 hover:text-[#1E88E5] focus:outline-none">
+        <i class="fa-solid fa-chart-simple text-lg"></i>
+        <span class="text-[10px] font-semibold mt-0.5">Dashboard</span>
+      </button>
+    </footer>
+
+    <!-- 5. MODAL POPUP SYNC (Buku Panduan Hal 7) -->
+    <div id="modal-sync" class="absolute inset-0 bg-black/50 z-50 flex items-end justify-center hidden" onclick="closeSyncModal()">
+      <div class="bg-white w-full rounded-t-none p-4 shadow-2xl space-y-2 transform transition-transform" onclick="event.stopPropagation()">
+        <h4 class="font-bold text-sm text-gray-800">Sync status</h4>
+        <div class="flex items-center space-x-3 bg-blue-50 p-3 rounded-none border border-blue-200">
+          <i class="fa-solid fa-cloud-arrow-up text-2xl text-[#1E88E5]"></i>
+          <div>
+            <h5 class="text-xs font-bold text-gray-800">Online</h5>
+            <p class="text-[11px] text-gray-600">Sync complete</p>
+            <p class="text-[10px] text-gray-400">Last sync: dalam beberapa detik</p>
+          </div>
+        </div>
+        <button onclick="closeSyncModal()" class="w-full py-2 bg-gray-100 rounded-none text-xs font-semibold text-gray-700">Tutup</button>
+      </div>
+    </div>
+
+    <!-- 6. MODAL WHATSAPP GATEWAY NOTIFICATION (Skripsi Hal 48) -->
+    <div id="modal-wa-alert" class="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white w-full max-w-xs rounded-none p-4 shadow-2xl space-y-3 border-t-4 border-red-500 animate-scale">
+        <div class="flex items-center space-x-2 text-red-600">
+          <i class="fa-brands fa-whatsapp text-2xl text-green-500"></i>
+          <h4 class="font-bold text-sm">Peringatan Foto Duplikat!</h4>
+        </div>
+        <div class="bg-gray-100 p-2.5 rounded-none text-xs text-gray-800 font-mono leading-relaxed border" id="wa-alert-message">
+          <!-- Text Dinamis Fonnte API -->
+        </div>
+        <p class="text-[10px] text-gray-500 italic text-center">Terkirim otomatis via Fonnte WhatsApp Gateway</p>
+        <button onclick="closeWaAlert()" class="w-full py-2 bg-[#1E88E5] text-white text-xs font-bold rounded-none shadow hover:bg-blue-600">Mengerti</button>
+      </div>
+    </div>
+
+    <!-- 7. MODAL ABOUT (Buku Panduan Hal 8) -->
+    <div id="modal-about" class="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-white w-full max-w-xs rounded-none p-4 shadow-2xl space-y-3 text-center">
+        <div class="w-12 h-12 mx-auto flex items-center justify-center bg-blue-50 rounded-full text-[#1E88E5] text-2xl">
+          <i class="fa-solid fa-snowflake text-amber-500"></i>
+        </div>
+        <h4 class="font-bold text-sm text-gray-800">EviTrack Kopindosat</h4>
+        <p class="text-[11px] text-gray-600 leading-relaxed text-justify">
+          EviTrack adalah aplikasi pintar yang dirancang untuk mempermudah proses verifikasi foto dengan sistem deteksi otomatis dan notifikasi real-time via WhatsApp Gateway serta verifikasi SHA-256.
+        </p>
+        <p class="text-[10px] text-gray-400">Versi 1.0.0 (Web Edition)</p>
+        <button onclick="closeAboutModal()" class="w-full py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-none hover:bg-gray-200">Tutup</button>
+      </div>
+    </div>
+
+    <!-- 8. MODAL GOOGLE ACCOUNT PICKER (DARK MODE NATIVE) -->
+    <div id="modal-google-picker" class="absolute inset-0 z-[60] bg-[#1F1F1F] flex flex-col hidden" onclick="if(event.target===this) closeGooglePicker()">
+      <!-- Top Bar -->
+      <div class="px-5 pt-4 pb-2 flex items-center space-x-3 shrink-0">
+        <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+        </svg>
+        <span class="text-[#E8EAED] text-[13px]">Login dengan Google</span>
+        <button type="button" onclick="closeGooglePicker()" class="ml-auto text-[#E8EAED] hover:text-white focus:outline-none">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto custom-scrollbar px-5 pb-5">
+        <!-- Logo AppSheet -->
+        <div class="flex justify-center mt-4 mb-4">
+          <svg width="56" height="56" viewBox="0 0 24 24">
+            <path d="M3.5 3.5 H20.5 L12 12 Z" fill="#1E88E5"/>
+            <path d="M3.5 3.5 L12 12 L3.5 20.5 Z" fill="#64B5F6"/>
+          </svg>
+        </div>
+
+        <!-- Judul -->
+        <h2 class="text-white text-[22px] font-medium text-center leading-tight">Pilih akun</h2>
+        <p class="text-center text-[13px] text-[#9AA0A6] mt-1.5">Lanjutkan ke <span class="text-[#8AB4F8]">Google AppSheet</span></p>
+
+        <!-- Daftar Akun -->
+        <div class="mt-7 space-y-0.5">
+          <!-- Akun 1 -->
+          <button type="button" onclick="selectGoogleAccount('prasetiyoafif12@gmail.com')" class="w-full flex items-center space-x-4 px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg transition">
+            <div class="w-9 h-9 rounded-full bg-black flex items-center justify-center text-white font-medium text-base shrink-0">A</div>
+            <div class="text-left min-w-0">
+              <p class="text-white text-[14px] font-medium leading-snug">afif prasetiyo</p>
+              <p class="text-[#9AA0A6] text-[12px] truncate">prasetiyoafif12@gmail.com</p>
+            </div>
+          </button>
+
+          <!-- Akun 2 -->
+          <button type="button" onclick="selectGoogleAccount('ahmad.afif.prasetiyo.te21@mhsw.pnj.ac.id')" class="w-full flex items-center space-x-4 px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg transition">
+            <div class="w-9 h-9 rounded-full bg-[#1A73E8] flex items-center justify-center text-white font-medium text-base shrink-0">A</div>
+            <div class="text-left min-w-0">
+              <p class="text-white text-[14px] font-medium leading-snug">AHMAD AFIF PRASETIYO Mahasiswa PNJ</p>
+              <p class="text-[#9AA0A6] text-[12px] truncate">ahmad.afif.prasetiyo.te21@mhsw.pnj.ac.id</p>
+            </div>
+          </button>
+
+          <!-- Akun 3 -->
+          <button type="button" onclick="selectGoogleAccount('prasetiyoafif41@gmail.com')" class="w-full flex items-center space-x-4 px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg transition">
+            <div class="w-9 h-9 rounded-full bg-[#5F6368] flex items-center justify-center text-white font-medium text-base shrink-0">A</div>
+            <div class="text-left min-w-0">
+              <p class="text-white text-[14px] font-medium leading-snug">Afif Prasetiyo</p>
+              <p class="text-[#9AA0A6] text-[12px] truncate">prasetiyoafif41@gmail.com</p>
+            </div>
+          </button>
+
+          <!-- Akun 4 -->
+          <button type="button" onclick="selectGoogleAccount('fadilarimbul16@gmail.com')" class="w-full flex items-center space-x-4 px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg transition">
+            <div class="w-9 h-9 rounded-full bg-[#188038] flex items-center justify-center text-white font-medium text-base shrink-0">M</div>
+            <div class="text-left min-w-0">
+              <p class="text-white text-[14px] font-medium leading-snug">Muh Fadil</p>
+              <p class="text-[#9AA0A6] text-[12px] truncate">fadilarimbul16@gmail.com</p>
+            </div>
+          </button>
+
+          <!-- Gunakan akun lain -->
+          <button type="button" onclick="useOtherAccount()" class="w-full flex items-center space-x-4 px-3 py-2.5 hover:bg-white/5 cursor-pointer rounded-lg transition">
+            <div class="w-9 h-9 rounded-full border border-[#5F6368] flex items-center justify-center text-[#E8EAED] shrink-0">
+              <i class="fa-regular fa-circle-user text-xl"></i>
+            </div>
+            <span class="text-white text-[14px]">Gunakan akun lain</span>
+          </button>
+        </div>
+
+        <!-- Persetujuan -->
+        <p class="text-[11px] text-[#9AA0A6] leading-relaxed mt-6">
+          Sebelum menggunakan aplikasi ini, Anda dapat meninjau <a href="#" class="text-[#8AB4F8]">Kebijakan Privasi</a> dan <a href="#" class="text-[#8AB4F8]">Persyaratan Layanan</a> Google AppSheet.
+        </p>
+      </div>
+
+      <!-- Footer -->
+      <div class="px-5 py-3 flex items-center justify-between text-[11px] text-[#9AA0A6] border-t border-white/10 shrink-0">
+        <button type="button" class="flex items-center space-x-1 hover:text-[#E8EAED]">
+          <span>Indonesia</span>
+          <i class="fa-solid fa-chevron-down text-[9px]"></i>
+        </button>
+        <div class="flex space-x-4">
+          <a href="#" class="hover:text-[#E8EAED]">Bantuan</a>
+          <a href="#" class="hover:text-[#E8EAED]">Privasi</a>
+          <a href="#" class="hover:text-[#E8EAED]">Persyaratan</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. SPLASH LOADING APPSHEET -->
+    <div id="splash-loading" class="absolute inset-0 z-[70] bg-white flex flex-col items-center justify-center space-y-4 hidden">
+      <div class="w-16 h-16 flex items-center justify-center bg-[#1E88E5] rounded-2xl shadow-lg">
+        <i class="fa-solid fa-snowflake text-amber-500 text-3xl"></i>
+      </div>
+      <i class="fa-solid fa-circle-notch fa-spin text-[#1E88E5] text-2xl"></i>
+      <p class="text-sm font-medium text-gray-600">Memuat akun...</p>
+    </div>
+
+  </div>
+
+  <!-- SCRIPT LOGIKA CORE (SHA-256, OCR INDEX CHECKER, UI ROUTER) -->
+  <script>
+    // DATA MOCK DATABASE (Sesuai Skripsi & Buku Panduan)
+    let pmDatabase = [
+      {
+        woNumber: "PM-20260802-066",
+        date: "Today, 10:15",
+        user: "Apip",
+        whatsapp: "62822113735",
+        indexNumber: "432",
+        hash: "bc1b2191bdd069ee632e6a1902d946b616fce4dd8c46165ee81bc4b066cd370b",
+        area: "Daop I Jakarta",
+        address: "Jl. Sadar Raya, Ciganjur, Kec. Jagakarsa, Kota Jakarta Selatan",
+        status: "Approved",
+        deskripsi: "Kabel aman terpasang rapi"
+      },
+      {
+        woNumber: "PM-20260801-065",
+        date: "Yesterday",
+        user: "Apip",
+        whatsapp: "62822113735",
+        indexNumber: "315",
+        hash: "be67700714bd3834ba8ceaf63deb63ef9bfdfba47e2b67baa1490a3b5fd42e2f",
+        area: "Daop I Jakarta",
+        address: "Jembatan Kereta Ape Cubang, Cipatat",
+        status: "Duplikat",
+        deskripsi: "Foto identik terdeteksi ganda"
+      },
+      {
+        woNumber: "PM-20260801-064",
+        date: "Yesterday",
+        user: "Apip",
+        whatsapp: "62822113735",
+        indexNumber: "256",
+        hash: "8f42406b91053f37c07ec1772e4686d79f6e3f5c35ababda58c1f84519d0d162",
+        area: "Daop II Bandung",
+        address: "Tol Purbaleunyi, Padalarang",
+        status: "Approved",
+        deskripsi: "Pengecekan tiang tumpu"
+      },
+      {
+        woNumber: "PM-20260731-063",
+        date: "31 Jul 2026",
+        user: "Apip",
+        whatsapp: "62822113735",
+        indexNumber: "1556",
+        hash: "4f435b871634bea78b6613066bd8faebac0082d9ee49916f5dface34078a724c",
+        area: "Daop II Bandung",
+        address: "Selajambe, Sukaluyu, Cianjur",
+        status: "Duplikat",
+        deskripsi: "Foto duplikasi patroli Daop 2"
+      },
+      {
+        woNumber: "PM-20260731-062",
+        date: "31 Jul 2026",
+        user: "Apip",
+        whatsapp: "62822113735",
+        indexNumber: "1589",
+        hash: "2ed1fa7ad351be207a5b764b8b1ed48abc461c3622579ba4e38581bde89af1fe",
+        area: "Daop II Bandung",
+        address: "Babakancaringin, Karangtengah, Cianjur",
+        status: "Approved",
+        deskripsi: "Inspeksi kabel udara"
+      }
+    ];
+
+    let currentStep = 1;
+    let mapInstance = null;
+
+    // ==================== AUTENTIKASI: GOOGLE LOGIN & REGISTER ====================
+    const DEFAULT_USER_ACCOUNTS = [
+      {
+        email: "ahmad.afif.prasetiyo.te21@mhsw.pnj.ac.id",
+        name: "Ahmad Afif Prasetiyo",
+        whatsapp: "62822113735",
+        role: "User",
+        gender: "Laki-laki"
+      },
+      {
+        email: "prasetiyoafif12@gmail.com",
+        name: "Ahmad Afif Prasetiyo",
+        whatsapp: "62822113735",
+        role: "User",
+        gender: "Laki-laki"
+      }
+    ];
+
+    let userAccounts = loadUserAccounts();
+    let activeSession = loadActiveSession();
+    let selectedGender = "Laki-laki";
+
+    function loadUserAccounts() {
+      let accounts = [];
+      try {
+        const raw = localStorage.getItem('evitrack_userAccounts');
+        if (raw) accounts = JSON.parse(raw);
+      } catch (e) { accounts = []; }
+      if (!Array.isArray(accounts)) accounts = [];
+      // Pastikan akun mock default selalu tersedia untuk simulasi
+      DEFAULT_USER_ACCOUNTS.forEach(def => {
+        if (!accounts.some(a => a.email === def.email)) accounts.unshift(def);
+      });
+      return accounts;
+    }
+
+    function saveUserAccounts() {
+      localStorage.setItem('evitrack_userAccounts', JSON.stringify(userAccounts));
+    }
+
+    function loadActiveSession() {
+      try {
+        const raw = localStorage.getItem('evitrack_activeSession');
+        if (raw) return JSON.parse(raw);
+      } catch (e) { return null; }
+      return null;
+    }
+
+    function saveActiveSession() {
+      if (activeSession) {
+        localStorage.setItem('evitrack_activeSession', JSON.stringify(activeSession));
+      } else {
+        localStorage.removeItem('evitrack_activeSession');
+      }
+    }
+
+    function formatRegisterDate() {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mi = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return `${dd}/${mm}/${yyyy}, ${hh}.${mi}.${ss}`;
+    }
+
+    // Terapkan sesi aktif ke seluruh UI (Home, Dashboard, Create PM, Location)
+    function applyActiveSession() {
+      if (!activeSession) return;
+      const name = activeSession.name || "User";
+      const initial = name.trim().charAt(0).toUpperCase() || "A";
+      const whatsapp = activeSession.whatsapp || "62822113735";
+      const picture = activeSession.picture || "";
+
+      const homeName = document.getElementById('home-user-name');
+      const homeInitial = document.getElementById('home-user-initial');
+      const homePhoto = document.getElementById('home-user-photo');
+      const dashName = document.getElementById('dash-user-name');
+      const dashInitial = document.getElementById('dash-user-initial');
+      const dashPhoto = document.getElementById('dash-user-photo');
+
+      if (homeName) homeName.textContent = name;
+      if (dashName) dashName.textContent = `Hai, ${name}`;
+
+      // Foto profil vs inisial (Home)
+      if (homePhoto && picture) {
+        homePhoto.src = picture;
+        homePhoto.classList.remove('hidden');
+        if (homeInitial) homeInitial.classList.add('hidden');
+      } else {
+        if (homePhoto) homePhoto.classList.add('hidden');
+        if (homeInitial) {
+          homeInitial.textContent = initial;
+          homeInitial.classList.remove('hidden');
+        }
+      }
+
+      // Foto profil vs inisial (Dashboard)
+      if (dashPhoto && picture) {
+        dashPhoto.src = picture;
+        dashPhoto.classList.remove('hidden');
+        if (dashInitial) dashInitial.classList.add('hidden');
+      } else {
+        if (dashPhoto) dashPhoto.classList.add('hidden');
+        if (dashInitial) {
+          dashInitial.textContent = initial;
+          dashInitial.classList.remove('hidden');
+        }
+      }
+
+      const inputUser = document.getElementById('input-user-name');
+      const inputWa = document.getElementById('input-whatsapp');
+      if (inputUser) inputUser.value = name;
+      if (inputWa) inputWa.value = whatsapp;
+
+      const locUser = document.getElementById('loc-user');
+      if (locUser) locUser.textContent = `${name} • Daop I Jakarta`;
+    }
+
+    // ==================== GOOGLE IDENTITY SERVICES (GIS) ====================
+    // Ganti dengan Client ID asli dari Google Cloud Console → APIs & Services → Credentials
+    const GOOGLE_CLIENT_ID = "MASUKKAN_GOOGLE_CLIENT_ID_KAMU_DISINI";
+
+    // Foto profil sementara (dipakai saat user baru diarahkan ke Register)
+    let pendingRegisterPicture = "";
+
+    // Decode payload JWT (ID Token) tanpa library eksternal
+    function parseJwt(token) {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    }
+
+    // Callback resmi dari tombol Google Sign-In
+    function handleCredentialResponse(response) {
+      const payload = parseJwt(response.credential);
+      const userEmail = payload.email;
+      const userName = payload.name;
+      const userPicture = payload.picture;
+
+      if (!userEmail) {
+        alert("Gagal membaca akun Google.");
+        return;
+      }
+
+      const trimmedEmail = userEmail.toLowerCase();
+      const existing = userAccounts.find(a => a.email.toLowerCase() === trimmedEmail);
+
+      if (existing) {
+        // Sinkronkan nama & foto profil terbaru dari Google
+        if (userName) existing.name = userName;
+        if (userPicture) existing.picture = userPicture;
+        saveUserAccounts();
+
+        activeSession = existing;
+        saveActiveSession();
+        applyActiveSession();
+        navigateView('view-home');
+      } else {
+        openRegisterForGoogle(trimmedEmail, userName, userPicture);
+      }
+    }
+
+    function openRegisterForGoogle(email, name, picture) {
+      const emailInput = document.getElementById('register-email');
+      emailInput.value = email || '';
+      emailInput.setAttribute('readonly', 'readonly');
+      document.getElementById('register-name').value = name || '';
+      document.getElementById('register-whatsapp').value = '';
+      selectGender('Laki-laki');
+      document.getElementById('register-date').value = formatRegisterDate();
+      pendingRegisterPicture = picture || '';
+      navigateView('view-register');
+    }
+
+    // Inisialisasi programmatic (fallback bila auto-render .g_id_signin tidak muncul)
+    function initGoogleIdentityFallback() {
+      if (!window.google || !window.google.accounts) return;
+      setTimeout(function () {
+        const autoBtn = document.querySelector('#view-login .g_id_signin iframe');
+        const container = document.getElementById('google-btn-container');
+        if (autoBtn || !container) return;
+        try {
+          google.accounts.id.initialize({
+            client_id: GOOGLE_CLIENT_ID,
+            callback: handleCredentialResponse
+          });
+          google.accounts.id.renderButton(container, {
+            theme: "outline",
+            size: "large",
+            width: 320,
+            shape: "rectangular",
+            text: "sign_in_with",
+            logo_alignment: "left"
+          });
+          container.classList.remove('hidden');
+        } catch (e) {
+          console.warn("GIS fallback gagal:", e);
+        }
+      }, 1200);
+    }
+
+    // LOGIN DENGAN GOOGLE (BUKA MODAL ACCOUNT PICKER)
+    function handleGoogleLogin() {
+      document.getElementById('modal-google-picker').classList.remove('hidden');
+    }
+
+    function closeGooglePicker() {
+      document.getElementById('modal-google-picker').classList.add('hidden');
+    }
+
+    function useOtherAccount() {
+      closeGooglePicker();
+      openRegisterForEmail('');
+    }
+
+    function showSplash() {
+      document.getElementById('splash-loading').classList.remove('hidden');
+    }
+    function hideSplash() {
+      document.getElementById('splash-loading').classList.add('hidden');
+    }
+
+    // PILIH AKUN DARI DAFTAR GOOGLE PICKER
+    function selectGoogleAccount(email) {
+      const trimmedEmail = (email || '').trim().toLowerCase();
+      const existing = userAccounts.find(a => a.email.toLowerCase() === trimmedEmail);
+      closeGooglePicker();
+
+      if (existing) {
+        // Splash loading singkat AppSheet (1 detik) lalu masuk
+        showSplash();
+        setTimeout(() => {
+          activeSession = existing;
+          saveActiveSession();
+          applyActiveSession();
+          hideSplash();
+          navigateView('view-home');
+        }, 1000);
+      } else {
+        openRegisterForEmail(trimmedEmail);
+      }
+    }
+
+    function openRegisterForEmail(email) {
+      const emailInput = document.getElementById('register-email');
+      emailInput.value = email || '';
+      if (email) {
+        emailInput.setAttribute('readonly', 'readonly');
+      } else {
+        emailInput.removeAttribute('readonly');
+      }
+      document.getElementById('register-name').value = '';
+      document.getElementById('register-whatsapp').value = '';
+      selectGender('Laki-laki');
+      document.getElementById('register-date').value = formatRegisterDate();
+      navigateView('view-register');
+    }
+
+    function selectGender(gender) {
+      selectedGender = gender;
+      const laki = document.getElementById('gender-laki');
+      const perempuan = document.getElementById('gender-perempuan');
+      if (gender === 'Laki-laki') {
+        laki.className = "py-2 text-sm font-medium bg-[#1E88E5] text-white";
+        perempuan.className = "py-2 text-sm font-medium bg-gray-100 text-gray-600";
+      } else {
+        laki.className = "py-2 text-sm font-medium bg-gray-100 text-gray-600";
+        perempuan.className = "py-2 text-sm font-medium bg-[#1E88E5] text-white";
+      }
+    }
+
+    function resetRegisterForm() {
+      document.getElementById('register-name').value = '';
+      document.getElementById('register-whatsapp').value = '';
+      selectGender('Laki-laki');
+      document.getElementById('register-date').value = formatRegisterDate();
+    }
+
+    function cancelRegister() {
+      navigateView('view-login');
+    }
+
+    // SIMPAN AKUN BARU & LANGSUNG LOGIN
+    function saveRegister() {
+      const email = document.getElementById('register-email').value.trim();
+      const name = document.getElementById('register-name').value.trim();
+      const whatsapp = document.getElementById('register-whatsapp').value.trim();
+
+      if (!email) {
+        alert("Email wajib diisi!");
+        return;
+      }
+      if (!name) {
+        alert("Nama Pengguna wajib diisi!");
+        return;
+      }
+      if (!whatsapp) {
+        alert("Nomor WhatsApp wajib diisi!");
+        return;
+      }
+
+      const newUser = {
+        email: email,
+        name: name,
+        whatsapp: whatsapp,
+        gender: selectedGender,
+        picture: pendingRegisterPicture || ""
+      };
+      userAccounts.push(newUser);
+      saveUserAccounts();
+
+      activeSession = newUser;
+      saveActiveSession();
+      applyActiveSession();
+      navigateView('view-home');
+    }
+
+    // FUNGSI CORE: HASHING SHA-256 MENGGUNAKAN WEB CRYPTO API
+    async function computeSHA256(inputString) {
+      const sanitized = inputString.toString().replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+      const encoder = new TextEncoder();
+      const data = encoder.encode(sanitized);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // GENERATE AUTO WO NUMBER (PM-YYYYMMDD-XXX)
+    function generateWoNumber() {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const randomSeq = String(pmDatabase.length + 67).padStart(3, '0');
+      return `PM-${yyyy}${mm}${dd}-${randomSeq}`;
+    }
+
+    // NAVIGASI HALAMAN (SPA VIEW ROUTING)
+    function navigateView(viewId) {
+      const views = ['view-login', 'view-register', 'view-home', 'view-create-pm', 'view-location', 'view-dashboard', 'view-pm-list'];
+      views.forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+      });
+      document.getElementById(viewId).classList.remove('hidden');
+
+      // Sembunyikan header & bottom nav saat berada di view autentikasi
+      const isAuthView = (viewId === 'view-login' || viewId === 'view-register');
+      document.getElementById('top-header').classList.toggle('hidden', isAuthView);
+      document.getElementById('bottom-nav').classList.toggle('hidden', isAuthView);
+
+      if (isAuthView) return;
+
+      // Update Title & Nav Styles
+      const titleElem = document.getElementById('app-bar-title');
+      const navHome = document.getElementById('nav-btn-home');
+      const navDash = document.getElementById('nav-btn-dashboard');
+
+      navHome.className = "flex flex-col items-center text-gray-400 hover:text-[#1E88E5]";
+      navDash.className = "flex flex-col items-center text-gray-400 hover:text-[#1E88E5]";
+
+      if (viewId === 'view-home') {
+        titleElem.textContent = "Home";
+        navHome.className = "flex flex-col items-center text-[#1E88E5]";
+      } else if (viewId === 'view-dashboard') {
+        titleElem.textContent = "Dashboard";
+        navDash.className = "flex flex-col items-center text-[#1E88E5]";
+        renderDashboard();
+      } else if (viewId === 'view-create-pm') {
+        titleElem.textContent = "Create PM";
+        document.getElementById('input-wo-number').value = generateWoNumber();
+        goToStep(1);
+      } else if (viewId === 'view-location') {
+        titleElem.textContent = "Location";
+        initLeafletMap();
+      } else if (viewId === 'view-pm-list') {
+        titleElem.textContent = "Preventive Maintenance";
+        renderPmList();
+      }
+    }
+
+    // FORM STEP WIZARD
+    function goToStep(step) {
+      currentStep = step;
+      [1, 2, 3].forEach(num => {
+        document.getElementById(`form-step-${num}`).classList.add('hidden');
+        const tab = document.getElementById(`step-tab-${num}`);
+        tab.className = "flex items-center space-x-1 text-gray-400";
+        tab.querySelector('span:first-child').className = "w-5 h-5 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-[10px]";
+      });
+
+      document.getElementById(`form-step-${step}`).classList.remove('hidden');
+      const activeTab = document.getElementById(`step-tab-${step}`);
+      activeTab.className = "flex items-center space-x-1 text-[#1E88E5] font-bold";
+      activeTab.querySelector('span:first-child').className = "w-5 h-5 rounded-full bg-[#1E88E5] text-white flex items-center justify-center text-[10px]";
+    }
+
+    function adjustKm(id, val) {
+      const el = document.getElementById(id);
+      el.value = Math.max(0, parseInt(el.value || 0) + val);
+      calculateJarak();
+    }
+
+    function calculateJarak() {
+      const start = parseInt(document.getElementById('input-km-start').value || 0);
+      const end = parseInt(document.getElementById('input-km-end').value || 0);
+      document.getElementById('input-km-jarak').value = Math.max(0, end - start);
+    }
+
+    function handleImageSelection(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const preview = document.getElementById('photo-preview');
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+        document.getElementById('photo-label').textContent = file.name;
+        
+        // Simulasi OCR instan: otomatis masukkan Index Number acak/contoh bila kosong
+        if (!document.getElementById('input-index-number').value) {
+          document.getElementById('input-index-number').value = "432";
+        }
+      }
+    }
+
+    // SUBMIT DAN LOGIKA DETEKSI DUPLIKASI (KUNCI INDEX NUMBER & SHA-256)
+    async function submitPreventiveMaintenance() {
+      const indexNumber = document.getElementById('input-index-number').value.trim();
+      const woNumber = document.getElementById('input-wo-number').value;
+      const userName = document.getElementById('input-user-name').value;
+      const alamat = document.getElementById('input-alamat').value;
+      const area = document.getElementById('input-area').value;
+      const deskripsi = document.getElementById('input-deskripsi').value;
+
+      if (!indexNumber) {
+        alert("Wajib memasukkan Index Number (hasil OCR)!");
+        return;
+      }
+
+      // Hitung Hash SHA-256 dari teks evidence
+      const rawString = `${indexNumber}_${alamat}_${new Date().toISOString()}`;
+      const generatedHash = await computeSHA256(rawString);
+
+      // CEK DUPLIKASI: Apakah Index Number sudah pernah ada di database?
+      const existingMatch = pmDatabase.find(item => item.indexNumber === indexNumber);
+
+      if (existingMatch) {
+        // TERDETEKSI DUPLIKAT!
+        const newRecord = {
+          woNumber: woNumber,
+          date: "Just now",
+          user: userName,
+          whatsapp: "62822113735",
+          indexNumber: indexNumber,
+          hash: generatedHash,
+          area: area,
+          address: alamat,
+          status: "Duplikat",
+          deskripsi: deskripsi
+        };
+        pmDatabase.unshift(newRecord);
+
+        // Munculkan notifikasi simulasi Fonnte WhatsApp Gateway
+        const messageText = `Yth. ${userName}, Mohon Maaf! Gambar yang Anda unggah dengan WO Number ${woNumber} memiliki kesamaan dengan gambar lain. Data yang serupa ditemukan pada WO Number berikut: ${existingMatch.woNumber}. Silakan periksa email Anda untuk informasi lebih lanjut.`;
+        document.getElementById('wa-alert-message').textContent = messageText;
+        document.getElementById('modal-wa-alert').classList.remove('hidden');
+
+      } else {
+        // SUKSES & VALID
+        const newRecord = {
+          woNumber: woNumber,
+          date: "Just now",
+          user: userName,
+          whatsapp: "62822113735",
+          indexNumber: indexNumber,
+          hash: generatedHash,
+          area: area,
+          address: alamat,
+          status: "Approved",
+          deskripsi: deskripsi
+        };
+        pmDatabase.unshift(newRecord);
+        alert(`Evidence Sukses! Status: Approved. Hash SHA-256: ${generatedHash.substring(0, 16)}...`);
+        navigateView('view-dashboard');
+      }
+    }
+
+    // RENDER DASHBOARD
+    function renderDashboard() {
+      const total = pmDatabase.length;
+      const approved = pmDatabase.filter(d => d.status === 'Approved').length;
+      const rejected = pmDatabase.filter(d => d.status === 'Duplikat').length;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-approved').textContent = approved;
+      document.getElementById('stat-rejected').textContent = rejected;
+
+      const tbody = document.getElementById('recap-table-body');
+      tbody.innerHTML = '';
+
+      pmDatabase.forEach(item => {
+        const isApproved = item.status === 'Approved';
+        const badgeColor = isApproved ? 'text-[#0288D1]' : 'text-[#E53935]';
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-gray-50";
+        tr.innerHTML = `
+          <td class="py-2.5 font-bold font-mono">${item.woNumber}</td>
+          <td class="py-2.5 text-gray-500">${item.date}</td>
+          <td class="py-2.5 font-bold ${badgeColor}">${item.status}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // RENDER LIST PREVENTIVE MAINTENANCE
+    function renderPmList() {
+      const container = document.getElementById('pm-card-container');
+      container.innerHTML = '';
+
+      pmDatabase.forEach(item => {
+        const isApp = item.status === 'Approved';
+        const statusClass = isApp ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700';
+        const card = document.createElement('div');
+        card.className = "bg-white p-3 rounded-none border border-gray-200 shadow-sm flex items-center justify-between";
+        card.innerHTML = `
+          <div>
+            <span class="text-xs font-bold text-gray-800 font-mono block">${item.woNumber}</span>
+            <span class="text-[11px] text-gray-500">${item.area} • Idx: ${item.indexNumber}</span>
+            <p class="text-[10px] text-gray-400 truncate max-w-[220px]">${item.address}</p>
+          </div>
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${statusClass}">${item.status}</span>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // LEAFLET MAPS INTEGRATION
+    function initLeafletMap() {
+      setTimeout(() => {
+        if (!mapInstance) {
+          mapInstance = L.map('map-container').setView([-6.3400, 106.8100], 14);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+          }).addTo(mapInstance);
+
+          const redIcon = L.divIcon({
+            html: '<i class="fa-solid fa-location-dot text-red-600 text-3xl"></i>',
+            className: 'custom-pin',
+            iconSize: [24, 24],
+            iconAnchor: [12, 24]
+          });
+
+          L.marker([-6.3420, 106.8120], { icon: redIcon }).addTo(mapInstance)
+            .bindPopup("<b>PM-20260802-066</b><br>Kabel Terkelupas - Jagakarsa")
+            .openPopup();
+        } else {
+          mapInstance.invalidateSize();
+        }
+      }, 200);
+    }
+
+    // MODAL HANDLERS
+    function toggleSidebar() {
+      const drawer = document.getElementById('sidebar-drawer');
+      const overlay = document.getElementById('drawer-overlay');
+      const isClosed = drawer.classList.contains('-translate-x-full');
+      if (isClosed) {
+        drawer.classList.remove('-translate-x-full');
+        overlay.classList.remove('hidden');
+      } else {
+        drawer.classList.add('-translate-x-full');
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function triggerSyncModal() {
+      const icon = document.getElementById('sync-icon');
+      icon.classList.add('fa-spin');
+      setTimeout(() => {
+        icon.classList.remove('fa-spin');
+        document.getElementById('modal-sync').classList.remove('hidden');
+      }, 500);
+    }
+    function closeSyncModal() {
+      document.getElementById('modal-sync').classList.add('hidden');
+    }
+
+    function closeWaAlert() {
+      document.getElementById('modal-wa-alert').classList.add('hidden');
+      navigateView('view-dashboard');
+    }
+
+    function openAboutModal() {
+      document.getElementById('modal-about').classList.remove('hidden');
+    }
+    function closeAboutModal() {
+      document.getElementById('modal-about').classList.add('hidden');
+    }
+
+    function searchAction() {
+      const q = prompt("Cari Work Order / Lokasi / Index Number:");
+      if (q) {
+        const found = pmDatabase.filter(d => 
+          d.woNumber.toLowerCase().includes(q.toLowerCase()) || 
+          d.indexNumber.includes(q) || 
+          d.address.toLowerCase().includes(q.toLowerCase())
+        );
+        if (found.length > 0) {
+          alert(`Ditemukan ${found.length} data:\n` + found.map(f => `${f.woNumber} [${f.status}] Index: ${f.indexNumber}`).join('\n'));
+        } else {
+          alert("Data tidak ditemukan.");
+        }
+      }
+    }
+
+    function logoutAction() {
+      const userName = activeSession ? activeSession.name : "user";
+      if (confirm(`Apakah Anda yakin ingin keluar dari akun ${userName}?`)) {
+        activeSession = null;
+        saveActiveSession();
+        document.getElementById('sidebar-drawer').classList.add('-translate-x-full');
+        document.getElementById('drawer-overlay').classList.add('hidden');
+        navigateView('view-login');
+      }
+    }
+
+    // INISIALISASI
+    window.onload = () => {
+      document.getElementById('input-wo-number').value = generateWoNumber();
+      renderDashboard();
+
+      // Inisialisasi Google Identity Services (fallback programmatic)
+      initGoogleIdentityFallback();
+
+      if (activeSession) {
+        applyActiveSession();
+        navigateView('view-home');
+      } else {
+        navigateView('view-login');
+      }
+    };
+  </script>
+</body>
+</html>
