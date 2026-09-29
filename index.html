@@ -1599,19 +1599,47 @@
       }
     }
 
-    // Upload foto evidence ke Firebase Storage (evidences/[timestamp]_[filename])
-    async function uploadEvidencePhoto(file) {
-      if (!storage || !file) return null;
-      try {
-        const timestamp = Date.now();
-        const safeName = String(file.name || 'evidence.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const ref = storage.ref(`evidences/${timestamp}_${safeName}`);
-        const snapshot = await ref.put(file);
-        return await snapshot.ref.getDownloadURL();
-      } catch (e) {
-        console.warn("[Firebase] Gagal upload foto evidence, fallback Base64:", e);
-        return null;
-      }
+    // Upload foto evidence ke Firebase Storage dengan batas waktu 3 detik (anti-stuck)
+    async function uploadToFirebaseWithTimeout(fileOrBlob) {
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            reject(new Error('Firebase timeout'));
+          }
+        }, 3000);
+
+        (async () => {
+          try {
+            if (!window.firebase || !firebase.apps.length) {
+              throw new Error('Firebase not ready');
+            }
+            const storageRef = firebase.storage();
+            const filePath = 'evidences/' + Date.now() + '.jpg';
+            const ref = storageRef.ref(filePath);
+
+            let snapshot;
+            if (typeof fileOrBlob === 'string' && fileOrBlob.startsWith('data:')) {
+              snapshot = await ref.putString(fileOrBlob, 'data_url');
+            } else {
+              snapshot = await ref.put(fileOrBlob);
+            }
+            const url = await snapshot.ref.getDownloadURL();
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              resolve(url);
+            }
+          } catch (err) {
+            if (!settled) {
+              settled = true;
+              clearTimeout(timer);
+              reject(err);
+            }
+          }
+        })();
+      });
     }
 
     // Fallback thumbnail Base64 kecil (downscale) bila Firebase gagal / offline
@@ -1662,13 +1690,29 @@
 
       const coords = currentEvidenceCoords ? [...currentEvidenceCoords] : [...DEFAULT_COORDS];
 
-      // Foto evidence: unggah ke Firebase Storage, fallback thumbnail Base64 bila offline/error
+      // Foto evidence: siapkan thumbnail lokal dulu (anti-stuck), lalu coba unggah Firebase dengan timeout
       const photoInputEl = document.getElementById('input-photo');
       let evidencePhoto = '';
       if (photoInputEl && photoInputEl.files && photoInputEl.files[0]) {
         const file = photoInputEl.files[0];
-        const uploadedUrl = await uploadEvidencePhoto(file);
-        evidencePhoto = uploadedUrl || await downscaleImageToDataUrl(file);
+
+        // 1) Fallback lokal (thumbnail Base64 kecil) — tidak akan pernah menggagalkan alur simpan
+        let localThumb = '';
+        try {
+          localThumb = await downscaleImageToDataUrl(file);
+        } catch (e) {
+          console.warn("Gagal membuat thumbnail lokal:", e);
+        }
+
+        // 2) Coba unggah ke Firebase dengan timeout 3 detik; bila gagal/lemot, pakai thumbnail
+        let uploadedUrl = '';
+        try {
+          uploadedUrl = await uploadToFirebaseWithTimeout(file);
+        } catch (err) {
+          console.warn("Firebase upload dilewati/gagal, fallback ke thumbnail lokal:", err);
+        }
+
+        evidencePhoto = uploadedUrl || localThumb || '';
       }
 
       // Hitung Hash SHA-256 dari string evidence di latar belakang
