@@ -316,9 +316,9 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">WhatsApp *</label>
             <input type="text" id="input-whatsapp" value="62822113735" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-mono text-gray-700">
           </div>
-          <div class="flex justify-between pt-3">
-            <button type="button" onclick="navigateView('view-home')" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Cancel</button>
-            <button type="button" onclick="goToStep(2)" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
+          <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+            <button type="button" id="btn-cancel-step1" onclick="navigateView('view-home')" class="px-4 py-2 text-xs font-medium text-gray-700 rounded-none hover:text-gray-900 hover:bg-gray-50">Cancel</button>
+            <button type="button" id="btn-next-step1" onclick="goToStep(2)" class="px-4 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
           </div>
         </div>
 
@@ -345,11 +345,11 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">Jarak</label>
             <input type="text" id="input-km-jarak" value="0 KM" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
           </div>
-          <div class="flex justify-between pt-3">
-            <button type="button" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
-            <div class="space-x-2">
-              <button type="button" onclick="navigateView('view-home')" class="px-3 py-2 text-xs font-medium text-gray-600 rounded-none">Cancel</button>
-              <button type="button" onclick="nextFromStep2()" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
+          <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+            <button type="button" id="btn-prev-step2" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-none hover:bg-gray-50">Prev</button>
+            <div class="flex items-center gap-3">
+              <button type="button" id="btn-cancel-step2" onclick="navigateView('view-home')" class="px-4 py-2 text-xs font-medium text-gray-700 rounded-none hover:text-gray-900 hover:bg-gray-50">Cancel</button>
+              <button type="button" id="btn-next-step2" onclick="nextFromStep2()" class="px-4 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
             </div>
           </div>
         </div>
@@ -410,13 +410,11 @@
             <p id="error-deskripsi" class="text-[10px] text-red-600 mt-1 hidden">Deskripsi temuan wajib diisi</p>
           </div>
 
-          <div class="flex justify-between pt-3">
-            <button type="button" onclick="goToStep(2)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
-            <div class="space-x-2">
-              <button type="button" onclick="navigateView('view-home')" class="px-3 py-2 text-xs font-medium text-gray-600 rounded-none">Cancel</button>
-              <button type="button" onclick="submitPreventiveMaintenance()" class="px-6 py-2 text-xs font-bold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600 flex items-center space-x-1">
-                <span>Save</span>
-              </button>
+          <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+            <button type="button" id="btn-prev" onclick="goToStep(2)" class="px-4 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-none hover:bg-gray-50">Prev</button>
+            <div class="flex items-center gap-3">
+              <button type="button" id="btn-cancel" onclick="navigateView('view-home')" class="px-4 py-2 text-xs font-medium text-gray-700 rounded-none hover:text-gray-900 hover:bg-gray-50">Cancel</button>
+              <button type="button" id="btn-save" onclick="submitPreventiveMaintenance()" class="px-4 py-2 text-xs font-bold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Save</button>
             </div>
           </div>
         </div>
