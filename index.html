@@ -322,7 +322,7 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">Start (KM)</label>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="adjustKm('input-km-start', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
-              <input type="number" id="input-km-start" value="85" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <input type="number" id="input-km-start" value="" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
               <button type="button" onclick="adjustKm('input-km-start', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
             </div>
           </div>
@@ -330,13 +330,13 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">End (KM)</label>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="adjustKm('input-km-end', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
-              <input type="number" id="input-km-end" value="96" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <input type="number" id="input-km-end" value="" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
               <button type="button" onclick="adjustKm('input-km-end', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
             </div>
           </div>
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Jarak</label>
-            <input type="text" id="input-km-jarak" value="11" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
+            <input type="text" id="input-km-jarak" value="" readonly class="w-full bg-gray-100 border border-gray-300 rounded-none px-3 py-2 text-sm font-bold text-gray-700">
           </div>
           <div class="flex justify-between pt-3">
             <button type="button" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
@@ -365,7 +365,7 @@
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Alamat</label>
-            <input type="text" id="input-alamat" value="Jl. Sadar Raya, Ciganjur, Kec. Jagakarsa, Kota Jakarta Selatan" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+            <input type="text" id="input-alamat" value="" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
           </div>
 
           <div>
@@ -393,8 +393,8 @@
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Deskripsi Temuan</label>
             <div class="flex items-center space-x-2">
-              <input type="text" id="input-deskripsi" value="Kabel tercoak" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
-              <button type="button" class="w-8 h-8 border border-gray-300 flex items-center justify-center text-gray-600 font-bold rounded-none">+</button>
+              <input type="text" id="input-deskripsi" value="" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+              <button type="button" class="w-8 h-8 border border-gray-300 flex items-center justify-center text-gray-600 rounded-none"><i class="fa-solid fa-plus"></i></button>
             </div>
           </div>
 
@@ -672,8 +672,8 @@
 
   <!-- SCRIPT LOGIKA CORE (SHA-256, OCR INDEX CHECKER, UI ROUTER) -->
   <script>
-    // DATA MOCK DATABASE (Sesuai Skripsi & Buku Panduan)
-    let pmDatabase = [
+    // DATA MOCK DATABASE (Seed default bila localStorage kosong)
+    const MOCK_PM_DATABASE = [
       {
         woNumber: "PM-20260802-066",
         date: "Today, 10:15",
@@ -745,6 +745,25 @@
         deskripsi: "Inspeksi kabel udara"
       }
     ];
+
+    // Simpan database tiket ke localStorage (persisten)
+    function savePmDatabase() {
+      localStorage.setItem('evitrack_pmDatabase', JSON.stringify(pmDatabase));
+    }
+
+    // Muat database tiket dari localStorage (fallback ke data seed)
+    function loadPmDatabase() {
+      try {
+        const raw = localStorage.getItem('evitrack_pmDatabase');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) { /* abaikan bila parse gagal */ }
+      return null;
+    }
+
+    let pmDatabase = loadPmDatabase() || MOCK_PM_DATABASE;
 
     let currentStep = 1;
     let mapInstance = null;
@@ -1191,8 +1210,7 @@
         renderDashboard();
       } else if (viewId === 'view-create-pm') {
         titleElem.textContent = "Create PM";
-        document.getElementById('input-wo-number').value = generateWoNumber();
-        goToStep(1);
+        resetCreatePMForm();
       } else if (viewId === 'view-location') {
         titleElem.textContent = "Location";
         initLeafletMap();
@@ -1228,6 +1246,47 @@
       const start = parseInt(document.getElementById('input-km-start').value || 0);
       const end = parseInt(document.getElementById('input-km-end').value || 0);
       document.getElementById('input-km-jarak').value = Math.max(0, end - start);
+    }
+
+    // RESET TOTAL FORM CREATE PM (EMPTY STATE) - dipanggil saat simpan sukses & saat menu Create PM dibuka
+    function resetCreatePMForm() {
+      // Step 1 (Identitas): WO Number baru, Nama & WhatsApp tetap profil login
+      document.getElementById('input-wo-number').value = generateWoNumber();
+      if (activeSession) {
+        document.getElementById('input-user-name').value = activeSession.name || "Apip";
+        document.getElementById('input-whatsapp').value = activeSession.whatsapp || "62822113735";
+      }
+
+      // Step 2 (Kilometer): kosongkan semua
+      document.getElementById('input-km-start').value = "";
+      document.getElementById('input-km-end').value = "";
+      document.getElementById('input-km-jarak').value = "";
+
+      // Step 3 (Temuan): reset foto, alamat, area, section, deskripsi
+      const photoInput = document.getElementById('input-photo');
+      if (photoInput) photoInput.value = "";
+      const preview = document.getElementById('photo-preview');
+      if (preview) {
+        preview.src = "";
+        preview.classList.add('hidden');
+      }
+      const photoLabel = document.getElementById('photo-label');
+      if (photoLabel) photoLabel.textContent = "Klik untuk ambil/unggah foto";
+
+      document.getElementById('input-alamat').value = "";
+
+      const areaSelect = document.getElementById('input-area');
+      areaSelect.value = "Daop I Jakarta";
+      handleAreaChange();
+
+      document.getElementById('input-deskripsi').value = "";
+
+      // Reset state variabel evidence
+      currentEvidenceCoords = null;
+      detectedIndexNumber = null;
+
+      // Kembali ke Step 1 (Page 1)
+      goToStep(1);
     }
 
     function handleImageSelection(event) {
@@ -1326,6 +1385,7 @@
         // TERDETEKSI DUPLIKAT!
         const newRecord = { ...baseRecord, status: "Duplikat" };
         pmDatabase.unshift(newRecord);
+        savePmDatabase();
 
         // Notifikasi simulasi Fonnte WhatsApp Gateway
         const messageText = `Yth. ${userName}, Mohon Maaf! Gambar yang Anda unggah dengan WO Number ${woNumber} memiliki kesamaan dengan gambar lain. Data yang serupa ditemukan pada WO Number berikut: ${existingMatch.woNumber}. Silakan periksa email Anda untuk informasi lebih lanjut.`;
@@ -1335,8 +1395,9 @@
         // UNIK & VALID
         const newRecord = { ...baseRecord, status: "Approved" };
         pmDatabase.unshift(newRecord);
-        alert(`Evidence Sukses! Status: Approved. Hash SHA-256: ${generatedHash.substring(0, 16)}...`);
-        navigateView('view-dashboard');
+        savePmDatabase();
+        resetCreatePMForm();
+        navigateView('view-home');
       }
     }
 
