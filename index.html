@@ -43,6 +43,11 @@
       transform-origin: center;
       display: inline-block;
     }
+    /* Form Guard: penanda border merah untuk field wajib yang belum valid */
+    .evi-field-error {
+      border-color: #EF4444 !important;
+      box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25);
+    }
   </style>
 </head>
 <body class="flex justify-center items-center min-h-screen sm:p-4">
@@ -324,7 +329,7 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">Start (KM)</label>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="adjustKm('input-km-start', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
-              <input type="number" id="input-km-start" value="" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <input type="number" id="input-km-start" value="0" oninput="calculateJarak(); clearKmError()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
               <button type="button" onclick="adjustKm('input-km-start', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
             </div>
           </div>
@@ -332,7 +337,7 @@
             <label class="block text-xs font-medium text-gray-600 mb-1">End (KM)</label>
             <div class="flex items-center space-x-2">
               <button type="button" onclick="adjustKm('input-km-end', -1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">-</button>
-              <input type="number" id="input-km-end" value="" oninput="calculateJarak()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
+              <input type="number" id="input-km-end" value="" oninput="calculateJarak(); clearKmError()" class="w-full text-center border border-gray-300 rounded-none py-2 text-sm font-bold">
               <button type="button" onclick="adjustKm('input-km-end', 1)" class="w-9 h-9 bg-gray-100 border rounded-none font-bold text-gray-700">+</button>
             </div>
           </div>
@@ -344,7 +349,7 @@
             <button type="button" onclick="goToStep(1)" class="px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-none">Prev</button>
             <div class="space-x-2">
               <button type="button" onclick="navigateView('view-home')" class="px-3 py-2 text-xs font-medium text-gray-600 rounded-none">Cancel</button>
-              <button type="button" onclick="goToStep(3)" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
+              <button type="button" onclick="nextFromStep2()" class="px-5 py-2 text-xs font-semibold bg-[#1E88E5] text-white rounded-none shadow hover:bg-blue-600">Next</button>
             </div>
           </div>
         </div>
@@ -356,23 +361,25 @@
           <!-- Box Upload Foto Evidence -->
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Upload Foto *</label>
-            <div onclick="document.getElementById('input-photo').click()" class="border-2 border-dashed border-gray-300 hover:border-[#1E88E5] rounded-none p-4 text-center cursor-pointer bg-gray-50 flex flex-col items-center justify-center">
+            <div id="photo-upload-box" tabindex="0" onclick="document.getElementById('input-photo').click()" class="border-2 border-dashed border-gray-300 hover:border-[#1E88E5] rounded-none p-4 text-center cursor-pointer bg-gray-50 flex flex-col items-center justify-center">
               <i class="fa-solid fa-camera text-3xl text-gray-400 mb-1"></i>
               <span id="photo-label" class="text-xs text-gray-500 font-medium">Klik untuk ambil/unggah foto</span>
               <img id="photo-preview" class="mt-2 max-h-36 rounded-none shadow hidden object-contain">
             </div>
             <button type="button" onclick="document.getElementById('input-photo').click()" class="text-xs text-[#1E88E5] border border-[#1E88E5] px-3 py-1 flex items-center space-x-1 mx-auto my-2 rounded-none"><i class="fa-solid fa-camera"></i> <span>Retake</span></button>
             <input type="file" id="input-photo" accept="image/*" class="hidden" onchange="handleImageSelection(event)">
+            <p id="error-photo" class="text-[10px] text-red-600 mt-1 hidden">Foto wajib diunggah</p>
           </div>
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Alamat</label>
-            <input type="text" id="input-alamat" value="" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+            <input type="text" id="input-alamat" value="" oninput="clearFieldError('input-alamat','error-alamat')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+            <p id="error-alamat" class="text-[10px] text-red-600 mt-1 hidden">Alamat wajib diisi minimal 3 karakter</p>
           </div>
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Area</label>
-            <select id="input-area" onchange="handleAreaChange()" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs bg-white text-gray-700">
+            <select id="input-area" onchange="handleAreaChange(); clearFieldError('input-area','error-area')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs bg-white text-gray-700">
               <option value="Daop I Jakarta">Daop I Jakarta</option>
               <option value="Daop II Bandung">Daop II Bandung</option>
               <option value="Daop III Cirebon">Daop III Cirebon</option>
@@ -383,21 +390,24 @@
               <option value="Daop VIII Surabaya">Daop VIII Surabaya</option>
               <option value="Daop IX Jember">Daop IX Jember</option>
             </select>
+            <p id="error-area" class="text-[10px] text-red-600 mt-1 hidden">Area wajib dipilih</p>
           </div>
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Section</label>
-            <select id="input-section" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs bg-white text-gray-700">
+            <select id="input-section" onchange="clearFieldError('input-section','error-section')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs bg-white text-gray-700">
               <!-- Diisi dinamis oleh handleAreaChange() -->
             </select>
+            <p id="error-section" class="text-[10px] text-red-600 mt-1 hidden">Section wajib dipilih</p>
           </div>
 
           <div>
             <label class="block text-xs font-medium text-gray-600 mb-1">Deskripsi Temuan</label>
             <div class="flex items-center space-x-2">
-              <input type="text" id="input-deskripsi" value="" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
+              <input type="text" id="input-deskripsi" value="" oninput="clearFieldError('input-deskripsi','error-deskripsi')" class="w-full border border-gray-300 rounded-none px-3 py-2 text-xs text-gray-700">
               <button type="button" class="w-8 h-8 border border-gray-300 flex items-center justify-center text-gray-600 rounded-none"><i class="fa-solid fa-plus"></i></button>
             </div>
+            <p id="error-deskripsi" class="text-[10px] text-red-600 mt-1 hidden">Deskripsi temuan wajib diisi</p>
           </div>
 
           <div class="flex justify-between pt-3">
@@ -1235,6 +1245,8 @@
       const el = document.getElementById(id);
       el.value = Math.max(0, parseInt(el.value || 0) + val);
       calculateJarak();
+      // Nilai diubah via tombol +/- => hilangkan tanda error pada field ini saja
+      if (el) el.classList.remove('evi-field-error');
     }
 
     function calculateJarak() {
@@ -1243,8 +1255,133 @@
       document.getElementById('input-km-jarak').value = Math.max(0, end - start);
     }
 
+    // ==================== FORM GUARD: VALIDASI WAJIB & ERROR STATE ====================
+    // Toggle tanda border merah + pesan error di bawah field terkait
+    function setFieldError(inputId, errorId, isError) {
+      const el = document.getElementById(inputId);
+      if (el) el.classList.toggle('evi-field-error', !!isError);
+      const err = document.getElementById(errorId);
+      if (err) err.classList.toggle('hidden', !isError);
+    }
+
+    function clearFieldError(inputId, errorId) {
+      setFieldError(inputId, errorId, false);
+    }
+
+    function clearKmError() {
+      ['input-km-start', 'input-km-end'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('evi-field-error');
+      });
+    }
+
+    function clearPhotoError() {
+      const box = document.getElementById('photo-upload-box');
+      if (box) box.classList.remove('evi-field-error');
+      setFieldError('input-photo', 'error-photo', false);
+    }
+
+    // Bersihkan seluruh state error (dipanggil saat reset form / simpan sukses)
+    function clearAllFormErrors() {
+      clearKmError();
+      clearPhotoError();
+      clearFieldError('input-alamat', 'error-alamat');
+      clearFieldError('input-area', 'error-area');
+      clearFieldError('input-section', 'error-section');
+      clearFieldError('input-deskripsi', 'error-deskripsi');
+    }
+
+    function isValidKmValue(value) {
+      const raw = String(value == null ? '' : value).trim();
+      return raw !== '' && !isNaN(Number(raw));
+    }
+
+    // Validasi Navigasi Step 2 -> Step 3 (tombol Next): wajib angka valid
+    function nextFromStep2() {
+      const startEl = document.getElementById('input-km-start');
+      const endEl = document.getElementById('input-km-end');
+
+      const startInvalid = !isValidKmValue(startEl.value);
+      const endInvalid = !isValidKmValue(endEl.value);
+
+      startEl.classList.toggle('evi-field-error', startInvalid);
+      endEl.classList.toggle('evi-field-error', endInvalid);
+
+      if (startInvalid || endInvalid) {
+        (startInvalid ? startEl : endEl).focus();
+        return; // blokir perpindahan ke Step 3
+      }
+
+      clearKmError();
+      goToStep(3);
+    }
+
+    // Validasi ketat field wajib Step 3 sebelum simpan (foto, alamat, area, section, deskripsi)
+    // Return true bila lolos; bila gagal fokuskan field pertama yang belum valid.
+    function validateEvidenceForm() {
+      const photoInput = document.getElementById('input-photo');
+      const alamatInput = document.getElementById('input-alamat');
+      const areaSelect = document.getElementById('input-area');
+      const sectionSelect = document.getElementById('input-section');
+      const deskripsiInput = document.getElementById('input-deskripsi');
+      const photoBox = document.getElementById('photo-upload-box');
+
+      let valid = true;
+      let firstInvalid = null;
+
+      // 1. Foto evidence wajib diunggah
+      const hasPhoto = !!(photoInput && photoInput.files && photoInput.files.length > 0);
+      if (photoBox) photoBox.classList.toggle('evi-field-error', !hasPhoto);
+      setFieldError('input-photo', 'error-photo', !hasPhoto);
+      if (!hasPhoto) {
+        valid = false;
+        if (!firstInvalid) firstInvalid = photoBox || photoInput;
+      }
+
+      // 2. Alamat wajib terisi minimal 3 karakter (selain spasi)
+      const alamatInvalid = !alamatInput || alamatInput.value.trim().length < 3;
+      setFieldError('input-alamat', 'error-alamat', alamatInvalid);
+      if (alamatInvalid) {
+        valid = false;
+        if (!firstInvalid) firstInvalid = alamatInput;
+      }
+
+      // 3. Area wajib terpilih
+      const areaInvalid = !areaSelect || !areaSelect.value;
+      setFieldError('input-area', 'error-area', areaInvalid);
+      if (areaInvalid) {
+        valid = false;
+        if (!firstInvalid) firstInvalid = areaSelect;
+      }
+
+      // 4. Section wajib terpilih
+      const sectionInvalid = !sectionSelect || !sectionSelect.value;
+      setFieldError('input-section', 'error-section', sectionInvalid);
+      if (sectionInvalid) {
+        valid = false;
+        if (!firstInvalid) firstInvalid = sectionSelect;
+      }
+
+      // 5. Deskripsi temuan wajib terisi
+      const deskripsiInvalid = !deskripsiInput || deskripsiInput.value.trim().length === 0;
+      setFieldError('input-deskripsi', 'error-deskripsi', deskripsiInvalid);
+      if (deskripsiInvalid) {
+        valid = false;
+        if (!firstInvalid) firstInvalid = deskripsiInput;
+      }
+
+      if (!valid && firstInvalid && typeof firstInvalid.focus === 'function') {
+        try { firstInvalid.focus(); } catch (e) { /* abaikan */ }
+      }
+
+      return valid;
+    }
+
     // RESET TOTAL FORM CREATE PM (EMPTY STATE) - dipanggil saat simpan sukses & saat menu Create PM dibuka
     function resetCreatePMForm() {
+      // Bersihkan seluruh state error validasi form
+      clearAllFormErrors();
+
       // Step 1 (Identitas): WO Number baru, Nama & WhatsApp tetap profil login
       document.getElementById('input-wo-number').value = generateWoNumber();
       if (activeSession) {
@@ -1252,8 +1389,8 @@
         document.getElementById('input-whatsapp').value = activeSession.whatsapp || "62822113735";
       }
 
-      // Step 2 (Kilometer): kosongkan semua
-      document.getElementById('input-km-start').value = "";
+      // Step 2 (Kilometer): Start KM default 0, End KM & Jarak dikosongkan
+      document.getElementById('input-km-start').value = "0";
       document.getElementById('input-km-end').value = "";
       document.getElementById('input-km-jarak').value = "";
 
@@ -1288,6 +1425,9 @@
     function handleImageSelection(event) {
       const file = event.target.files[0];
       if (file) {
+        // Foto terpilih: bersihkan tanda error foto wajib
+        clearPhotoError();
+
         const preview = document.getElementById('photo-preview');
         preview.src = URL.createObjectURL(file);
         preview.classList.remove('hidden');
@@ -1400,6 +1540,12 @@
 
     // SUBMIT & MATRIKS VERIFIKASI FOTO EVIDENCE (DUPLIKAT / REJECT / APPROVED)
     async function submitPreventiveMaintenance() {
+      // FORM GUARD: validasi ketat field wajib sebelum evaluasi foto & simpan.
+      // Bila gagal -> jangan simpan, jangan kirim email, fokuskan field error.
+      if (!validateEvidenceForm()) {
+        return;
+      }
+
       const woNumber = document.getElementById('input-wo-number').value;
       const userName = document.getElementById('input-user-name').value;
       const whatsapp = document.getElementById('input-whatsapp').value || "62822113735";
