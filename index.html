@@ -13,6 +13,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <!-- Google Identity Services SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- EmailJS Browser SDK v4 -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
   <style>
     /* Palet Warna Persis AppSheet Kopindosat */
@@ -657,6 +659,13 @@
 
   <!-- SCRIPT LOGIKA CORE (SHA-256, OCR INDEX CHECKER, UI ROUTER) -->
   <script>
+    // Inisialisasi EmailJS dengan Public Key aktif (di awal script utama)
+    (function() {
+      emailjs.init({
+        publicKey: "KuYNc-tMoO5W1mnqg"
+      });
+    })();
+
     // DATA MOCK DATABASE (Seed default bila localStorage kosong)
     const MOCK_PM_DATABASE = [
       {
@@ -1339,53 +1348,53 @@
       }
     }
 
-    // DISPATCHER PENGIRIMAN EMAIL NOTIFIKASI VERIFIKASI (Duplikat / Reject)
+    // DISPATCHER PENGIRIMAN EMAIL NOTIFIKASI VERIFIKASI VIA EMAILJS (Duplikat / Reject)
     async function sendVerificationNotificationEmail(ticket, statusType, reason, matchedWo) {
       const userSession = JSON.parse(localStorage.getItem('evitrack_activeSession') || '{}');
       const recipientEmail = userSession.email || userSession.userEmail;
       const recipientName = userSession.name || userSession.userName || "Teknisi";
 
       if (!recipientEmail) {
-        console.warn("[Email Dispatcher] Tidak ada email penerima yang aktif.");
+        console.warn("[EmailJS] Email penerima aktif tidak ditemukan.");
         return;
       }
 
-      const emailSubject = `[EviTrack] Status Tiket: ${statusType} - WO Number ${ticket.woNumber}`;
-      const emailBody = `Yth. ${recipientName},\nPerihal: Pemberitahuan Status Verifikasi Evidence\n\nDengan hormat,\n\nLaporan Preventive Maintenance yang Anda ajukan dengan nomor:\nWO Number: ${ticket.woNumber}\nArea / Section: ${ticket.area} - ${ticket.section}\n\nDinyatakan: ${statusType.toUpperCase()}\nKeterangan: ${reason}\n\n` +
-        (statusType === 'Duplikat' && matchedWo ? `Catatan Khusus: Gambar yang Anda unggah memiliki kesamaan dengan WO Number: ${matchedWo}\n\n` : '') +
-        `Kami mohon untuk melakukan pengambilan foto ulang di lapangan sesuai dengan standar operasional yang berlaku (wajib menggunakan kamera timestamp yang jelas dan terbaca).\n\nHormat kami,\nTim Verifikasi Data EviTrack\nprasetiyoafif61@gmail.com`;
+      const detailMessage =
+        `WO Number: ${ticket.woNumber}\n` +
+        `Area / Section: ${ticket.area} - ${ticket.section}\n` +
+        `Status: ${statusType.toUpperCase()}\n` +
+        `Keterangan: ${reason}` +
+        (matchedWo ? `\nData Serupa: ${matchedWo}` : '');
 
-      // Simpan di Outbox LocalStorage agar selalu bisa diverifikasi pengirimannya
-      const outbox = JSON.parse(localStorage.getItem('evitrack_outboxEmails') || '[]');
-      outbox.push({
-        to: recipientEmail,
-        status: statusType,
-        subject: emailSubject,
-        body: emailBody,
-        timestamp: new Date().toLocaleString('id-ID')
-      });
-      localStorage.setItem('evitrack_outboxEmails', JSON.stringify(outbox));
+      const templateParams = {
+        to_email: recipientEmail,
+        to_name: recipientName,
+        subject: `[EviTrack] Status Tiket: ${statusType} - WO Number ${ticket.woNumber}`,
+        message: detailMessage,
+        reply_to: "prasetiyoafif61@gmail.com"
+      };
 
-      // Pengiriman via Web3Forms API
+      // Simpan riwayat pengiriman ke LocalStorage (Outbox)
       try {
-        const response = await fetch("https://api.web3forms.com/submit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-          },
-          body: JSON.stringify({
-            access_key: "909f32a6-1bf6-41f1-a3c1-95b5d8bf9a38", // Pengguna dapat mengganti dengan key pribadinya jika ada
-            to: recipientEmail,
-            from_name: "EviTrack System (prasetiyoafif61@gmail.com)",
-            subject: emailSubject,
-            message: emailBody
-          })
+        const outbox = JSON.parse(localStorage.getItem('evitrack_outboxEmails') || '[]');
+        outbox.push({
+          to: recipientEmail,
+          status: statusType,
+          subject: templateParams.subject,
+          message: detailMessage,
+          timestamp: new Date().toLocaleString('id-ID')
         });
-        const resData = await response.json();
-        console.log("[Email Dispatcher Result]", resData);
+        localStorage.setItem('evitrack_outboxEmails', JSON.stringify(outbox));
+      } catch (e) {
+        console.warn("Gagal menyimpan outbox:", e);
+      }
+
+      // Eksekusi pengiriman email di background
+      try {
+        const res = await emailjs.send("service_1wnxdqb", "template_89fjopb", templateParams);
+        console.log("[EmailJS Success]", res.status, res.text);
       } catch (err) {
-        console.error("[Email Dispatcher Error]", err);
+        console.error("[EmailJS Dispatcher Error]", err);
       }
     }
 
@@ -1437,11 +1446,11 @@
       } else if (isLowResolution || hasBlurIndication) {
         // B. REJECT - BLUR
         status = 'Reject';
-        rejectionReason = 'Kualitas gambar buram (blur) sehingga detail kondisi kabel dan aset tidak dapat diverifikasi.';
+        rejectionReason = 'Kualitas gambar buram (blur) sehingga detail aset tidak dapat diverifikasi.';
       } else if (!hasTimestampWatermark && !hasGpsWatermark) {
         // C. REJECT - TIMESTAMP TIDAK LENGKAP
         status = 'Reject';
-        rejectionReason = 'Informasi watermark timestamp tidak lengkap atau nomor indeks/koordinat tidak terdeteksi pada gambar.';
+        rejectionReason = 'Informasi watermark timestamp tidak lengkap atau nomor indeks/koordinat tidak terdeteksi.';
       }
 
       const newRecord = {
