@@ -17,6 +17,9 @@
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <!-- Chart.js CDN (diagram statistik Dashboard) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK (Storage Evidence) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
 
   <style>
     /* Palet Warna Persis AppSheet Kopindosat */
@@ -706,11 +709,29 @@
       });
     })();
 
+    // Inisialisasi Firebase (Storage Evidence)
+    const firebaseConfig = {
+      apiKey: "AIzaSyCLtakCBl8OSZdfkaNwJeLRKJZ14WqLnj0",
+      authDomain: "evitrack-8434e.firebaseapp.com",
+      projectId: "evitrack-8434e",
+      storageBucket: "evitrack-8434e.firebasestorage.app",
+      messagingSenderId: "583592795512",
+      appId: "1:583592795512:web:6da2f4080cb2f5d8f37c8d",
+      measurementId: "G-2TVQB7J2CN"
+    };
+    let storage = null;
+    if (typeof firebase !== 'undefined') {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      }
+      storage = firebase.storage();
+    }
+
     // DATA MOCK DATABASE (Seed default bila localStorage kosong)
     const MOCK_PM_DATABASE = [
       {
         woNumber: "PM-20260802-066",
-        date: "Today, 10:15",
+        createdAt: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
         user: "Apip",
         whatsapp: "62822113735",
         indexNumber: "432",
@@ -724,7 +745,7 @@
       },
       {
         woNumber: "PM-20260801-065",
-        date: "Yesterday",
+        createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
         user: "Apip",
         whatsapp: "62822113735",
         indexNumber: "315",
@@ -738,7 +759,7 @@
       },
       {
         woNumber: "PM-20260801-064",
-        date: "Yesterday",
+        createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString(),
         user: "Apip",
         whatsapp: "62822113735",
         indexNumber: "256",
@@ -752,7 +773,7 @@
       },
       {
         woNumber: "PM-20260731-063",
-        date: "31 Jul 2026",
+        createdAt: new Date(Date.now() - 49 * 60 * 60 * 1000).toISOString(),
         user: "Apip",
         whatsapp: "62822113735",
         indexNumber: "1556",
@@ -766,7 +787,7 @@
       },
       {
         woNumber: "PM-20260731-062",
-        date: "31 Jul 2026",
+        createdAt: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
         user: "Apip",
         whatsapp: "62822113735",
         indexNumber: "1589",
@@ -1578,6 +1599,46 @@
       }
     }
 
+    // Upload foto evidence ke Firebase Storage (evidences/[timestamp]_[filename])
+    async function uploadEvidencePhoto(file) {
+      if (!storage || !file) return null;
+      try {
+        const timestamp = Date.now();
+        const safeName = String(file.name || 'evidence.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const ref = storage.ref(`evidences/${timestamp}_${safeName}`);
+        const snapshot = await ref.put(file);
+        return await snapshot.ref.getDownloadURL();
+      } catch (e) {
+        console.warn("[Firebase] Gagal upload foto evidence, fallback Base64:", e);
+        return null;
+      }
+    }
+
+    // Fallback thumbnail Base64 kecil (downscale) bila Firebase gagal / offline
+    function downscaleImageToDataUrl(file, maxWidth = 640, quality = 0.7) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const scale = Math.min(1, maxWidth / img.width);
+            const w = Math.round(img.width * scale);
+            const h = Math.round(img.height * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = () => resolve(reader.result);
+          img.src = reader.result;
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+      });
+    }
+
     // SUBMIT & MATRIKS VERIFIKASI FOTO EVIDENCE (DUPLIKAT / REJECT / APPROVED)
     async function submitPreventiveMaintenance() {
       // FORM GUARD: validasi ketat field wajib sebelum evaluasi foto & simpan.
@@ -1601,16 +1662,13 @@
 
       const coords = currentEvidenceCoords ? [...currentEvidenceCoords] : [...DEFAULT_COORDS];
 
-      // Baca foto evidence sebagai Base64 Data URL agar tersimpan utuh di objek tiket
+      // Foto evidence: unggah ke Firebase Storage, fallback thumbnail Base64 bila offline/error
       const photoInputEl = document.getElementById('input-photo');
       let evidencePhoto = '';
       if (photoInputEl && photoInputEl.files && photoInputEl.files[0]) {
-        evidencePhoto = await new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(photoInputEl.files[0]);
-        });
+        const file = photoInputEl.files[0];
+        const uploadedUrl = await uploadEvidencePhoto(file);
+        evidencePhoto = uploadedUrl || await downscaleImageToDataUrl(file);
       }
 
       // Hitung Hash SHA-256 dari string evidence di latar belakang
@@ -1653,7 +1711,7 @@
 
       const newRecord = {
         woNumber: woNumber,
-        date: "Just now",
+        createdAt: new Date().toISOString(),
         user: userName,
         whatsapp: whatsapp,
         indexNumber: detectedIndexNumber,
@@ -1696,36 +1754,22 @@
       chartInstances = [];
     }
 
-    // Helper waktu ramah pengguna (relative time)
-    function formatRelativeTime(dateString) {
-      if (!dateString) return '';
-      const str = String(dateString).trim();
-
-      if (/just now/i.test(str)) return 'Just now';
-      if (/yesterday/i.test(str)) return 'Yesterday';
-
-      const todayMatch = str.match(/today,\s*(\d{1,2}):(\d{2})/i);
-      if (todayMatch) return 'Today';
-
-      // Format "DD Mon YYYY" — sudah ramah pengguna, kembalikan apa adanya
-      if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(str)) return str;
-
-      // Coba parse sebagai tanggal / ISO string lalu hitung selisih relatif
-      const parsed = new Date(str);
-      if (!isNaN(parsed.getTime())) {
-        const diffMs = Date.now() - parsed.getTime();
-        const minutes = Math.floor(diffMs / 60000);
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-        const hours = Math.floor(minutes / 60);
-        if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-        const days = Math.floor(hours / 24);
-        if (days === 1) return 'Yesterday';
-        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        return `${String(parsed.getDate()).padStart(2,'0')} ${months[parsed.getMonth()]} ${parsed.getFullYear()}`;
-      }
-
-      return str;
+    // Helper waktu relatif (dynamic relative time) — menghindari "just now" statis
+    function formatRelativeTime(dateInput) {
+      if (!dateInput) return '-';
+      const now = new Date();
+      const past = new Date(dateInput);
+      if (isNaN(past.getTime())) return '-';
+      const diffSec = Math.floor((now - past) / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHour / 24);
+      if (diffMin < 1) return 'Just now';
+      if (diffMin < 60) return `${diffMin} ${diffMin === 1 ? 'minute' : 'minutes'} ago`;
+      if (diffHour < 24) return `${diffHour} ${diffHour === 1 ? 'hour' : 'hours'} ago`;
+      if (diffDay === 1) return 'Yesterday';
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${String(past.getDate()).padStart(2, '0')} ${months[past.getMonth()]} ${past.getFullYear()}`;
     }
 
     // Tanggal dinamis header Info Account (contoh: Minggu, 02/08/2026)
@@ -1766,18 +1810,18 @@
         const woColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-gray-500');
         // Result: teks status murni tanpa pill tebal
         const resultColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-orange-500');
-        // Photo: thumbnail evidence asli (Base64 / URL) atau placeholder netral bila kosong
-        const photoSrc = item.photo || item.photoUrl || item.image || item.evidenceImage || item.evidencePhoto || item.foto || '';
+        // Photo: thumbnail evidence (Firebase URL / Base64) atau placeholder netral bila kosong
+        const photoSrc = item.photo || '';
         const hasPhoto = !!photoSrc && (/^data:image\//i.test(photoSrc) || /^https?:\/\//i.test(photoSrc));
         const photoCell = hasPhoto
-          ? `<img src="${photoSrc}" alt="Evidence" class="w-10 h-10 object-cover rounded-md border border-gray-300 shadow-sm cursor-pointer">`
-          : `<div class="w-10 h-10 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400"><i class="fa-solid fa-image text-sm"></i></div>`;
+          ? `<img src="${photoSrc}" alt="Evidence" class="w-10 h-10 object-cover rounded-md border border-gray-300 shadow-sm mx-auto">`
+          : `<div class="w-10 h-10 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 mx-auto"><i class="fa-solid fa-image text-sm"></i></div>`;
 
         const tr = document.createElement('tr');
         tr.className = "hover:bg-gray-50";
         tr.innerHTML = `
           <td class="py-2.5 pr-2 font-semibold font-mono"><a href="#" class="${woColor} underline decoration-dotted">${item.woNumber}</a></td>
-          <td class="py-2.5 pr-2 text-gray-500 whitespace-nowrap">${formatRelativeTime(item.date)}</td>
+          <td class="py-2.5 pr-2 text-gray-500 whitespace-nowrap">${formatRelativeTime(item.createdAt || item.timestamp || item.date)}</td>
           <td class="py-2.5 pr-2 font-medium ${resultColor}">${item.status}</td>
           <td class="py-2.5">${photoCell}</td>
         `;
