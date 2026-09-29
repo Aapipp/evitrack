@@ -15,6 +15,8 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- EmailJS Browser SDK v4 -->
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <!-- Chart.js CDN (diagram statistik Dashboard) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     /* Palet Warna Persis AppSheet Kopindosat */
@@ -58,24 +60,18 @@
     <!-- 1. TOP HEADER APP BAR (Buku Panduan Hal 3) -->
     <header id="top-header" class="bg-[#1E88E5] text-white px-4 py-3 flex items-center justify-between shadow-md z-30 select-none hidden">
       <div class="flex items-center space-x-3">
-        <button onclick="toggleSidebar()" class="text-white hover:text-gray-200 focus:outline-none">
-          <i class="fa-solid fa-bars text-xl"></i>
+        <button type="button" onclick="toggleSidebar()" class="text-white p-1">
+          <i class="fa-solid fa-bars text-lg"></i>
         </button>
-        <!-- Logo Bintang Oranye-Kuning Khas EviTrack -->
-        <div class="w-7 h-7 flex items-center justify-center bg-white rounded-full p-1 shadow-inner">
-          <i class="fa-solid fa-snowflake text-amber-500 text-lg"></i>
+        <!-- Logo & Label: ikon asterisk online bersanding dengan judul halaman -->
+        <div class="flex items-center space-x-1">
+          <i class="fa-solid fa-asterisk text-amber-400 text-lg"></i>
+          <h1 id="app-bar-title" class="font-semibold text-lg tracking-wide">Home</h1>
         </div>
-        <h1 id="app-bar-title" class="font-semibold text-lg tracking-wide">Home</h1>
       </div>
-      <div class="flex items-center space-x-3">
-        <button onclick="searchAction()" class="hover:text-gray-200">
-          <i class="fa-solid fa-magnifying-glass text-lg"></i>
-        </button>
-        <!-- Tombol Sinkronisasi Data (Buku Panduan Hal 7) -->
-        <button onclick="triggerSyncModal()" class="hover:text-gray-200">
-          <i id="sync-icon" class="fa-solid fa-rotate text-lg"></i>
-        </button>
-      </div>
+      <button type="button" onclick="renderDashboardData()" class="text-white p-1">
+        <i class="fa-solid fa-rotate-right text-lg"></i>
+      </button>
     </header>
 
     <!-- 2. SIDEBAR DRAWER (Buku Panduan Hal 8) -->
@@ -445,61 +441,95 @@
         </div>
       </section>
 
-      <!-- ==================== VIEW 4: DASHBOARD (Buku Panduan Hal 6) ==================== -->
-      <section id="view-dashboard" class="p-4 space-y-4 hidden">
+      <!-- ==================== VIEW 4: DASHBOARD (Buku Panduan Hal 11-13) ==================== -->
+      <section id="view-dashboard" class="hidden">
         <!-- Info Account Card (Gradient CSS) -->
-        <div class="rounded-none p-4 text-white shadow-md relative overflow-hidden" style="background: linear-gradient(135deg, #1E88E5 0%, #1565C0 100%);">
-          <div class="flex justify-between items-center mb-2">
+        <div class="bg-gradient-to-b from-[#1E88E5] to-[#1565C0] text-white px-4 pt-3 pb-5">
+          <div class="flex justify-between items-center mb-3">
             <h3 class="font-bold text-sm tracking-wide">Info Account</h3>
-            <span id="dash-date" class="text-[10px] opacity-80">Wednesday, 30/09/2026</span>
+            <span id="dash-date" class="text-[11px] opacity-90">Minggu, 02/08/2026</span>
           </div>
-          <div class="flex items-center space-x-3 mb-3">
-            <img id="dash-user-photo" src="" alt="Foto Profil" class="w-10 h-10 rounded-full object-cover hidden">
-            <div id="dash-user-initial" class="w-10 h-10 rounded-full bg-white text-[#1E88E5] flex items-center justify-center font-bold">
-              A
-            </div>
+          <div class="flex items-center space-x-3 mb-4">
+            <img id="dash-user-photo" src="https://ui-avatars.com/api/?name=User&background=ffffff&color=1E88E5" alt="Foto Profil" class="w-11 h-11 rounded-full object-cover border-2 border-white/40">
+            <div id="dash-user-initial" class="w-11 h-11 rounded-full bg-white text-[#1E88E5] flex items-center justify-center font-bold hidden">A</div>
             <div>
               <h4 id="dash-user-name" class="font-bold text-sm leading-tight">Hai, Apip</h4>
-              <p class="text-[11px] text-blue-100">Anda login sebagai User</p>
+              <p class="text-[11px] text-blue-100">Anda login sebagai user</p>
             </div>
           </div>
 
-          <!-- Counter Information Badges (Total PM, Duplikat, Approved) -->
+          <!-- Information: Total PM / Duplikat / Approved -->
           <div class="grid grid-cols-3 gap-2 text-center text-gray-800">
-            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
-              <span class="text-[10px] font-bold block text-gray-500">PM</span>
-              <span id="stat-total" class="text-base font-extrabold text-[#1E88E5]">6</span>
+            <div class="bg-white rounded p-2.5 shadow-sm">
+              <span class="text-[10px] font-bold block text-gray-500 mb-1">PM</span>
+              <div class="flex items-center justify-center space-x-1">
+                <span id="stat-total" class="text-base font-extrabold text-[#1E88E5]">6</span>
+                <i class="fa-solid fa-pencil text-amber-600 text-sm"></i>
+              </div>
             </div>
-            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
-              <span class="text-[10px] font-bold block text-red-500">Rejected</span>
-              <span id="stat-rejected" class="text-base font-extrabold text-[#E53935]">2</span>
+            <div class="bg-white rounded p-2.5 shadow-sm">
+              <span class="text-[10px] font-bold block text-gray-500 mb-1">Duplikat</span>
+              <div class="flex items-center justify-center space-x-1">
+                <span id="stat-duplikat" class="text-base font-extrabold text-red-600">2</span>
+                <i class="fa-solid fa-xmark text-red-600 text-base font-black"></i>
+              </div>
             </div>
-            <div class="bg-white/90 backdrop-blur rounded-none p-2 shadow-inner">
-              <span class="text-[10px] font-bold block text-blue-600">Approved</span>
-              <span id="stat-approved" class="text-base font-extrabold text-[#0288D1]">4</span>
+            <div class="bg-white rounded p-2.5 shadow-sm">
+              <span class="text-[10px] font-bold block text-gray-500 mb-1">Approved</span>
+              <div class="flex items-center justify-center space-x-1">
+                <span id="stat-approved" class="text-base font-extrabold text-blue-900">4</span>
+                <i class="fa-solid fa-check text-blue-900 text-base font-black"></i>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Tabel Recapitulation List -->
-        <div class="bg-white rounded-none shadow-sm border border-gray-200 p-3">
-          <div class="flex justify-between items-center mb-2 pb-1 border-b">
-            <h4 class="font-bold text-xs text-gray-700">Recapitulation</h4>
-            <span class="text-[10px] text-gray-400">Terbaru</span>
+        <div class="p-4 space-y-4">
+          <!-- Tabel Recapitulation List -->
+          <div class="bg-white rounded-none shadow-sm border border-gray-200 p-3">
+            <div class="flex items-center justify-between mb-2 pb-1 border-b">
+              <h4 class="font-bold text-xs text-gray-700 flex items-center space-x-1.5">
+                Recapitulation
+                <span id="recap-count-badge" class="w-5 h-5 rounded-full bg-[#1E88E5] text-white text-[10px] font-bold flex items-center justify-center">0</span>
+              </h4>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-[11px]">
+                <thead>
+                  <tr class="text-gray-400 border-b">
+                    <th class="pb-1 font-semibold">Wo Number ↓</th>
+                    <th class="pb-1 font-semibold">Date.</th>
+                    <th class="pb-1 font-semibold">Result</th>
+                    <th class="pb-1 font-semibold">Photo</th>
+                  </tr>
+                </thead>
+                <tbody id="recap-table-body" class="divide-y divide-gray-100">
+                  <!-- Di-render dinamis oleh JavaScript -->
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-[11px]">
-              <thead>
-                <tr class="text-gray-400 border-b">
-                  <th class="pb-1 font-semibold">WO Number</th>
-                  <th class="pb-1 font-semibold">Date</th>
-                  <th class="pb-1 font-semibold">Result</th>
-                </tr>
-              </thead>
-              <tbody id="recap-table-body" class="divide-y divide-gray-100">
-                <!-- Di-render dinamis oleh JavaScript -->
-              </tbody>
-            </table>
+
+          <!-- Grafik Berdasarkan Status Upload -->
+          <div class="bg-white rounded-none shadow-sm border border-gray-200 p-3">
+            <div class="flex items-center mb-2">
+              <span class="w-5 h-5 rounded-full bg-[#1E88E5] text-white text-[10px] font-bold flex items-center justify-center mr-1.5">1</span>
+              <h4 class="font-bold text-xs text-gray-700">Grafik Berdasarkan Status Upload</h4>
+            </div>
+            <div class="relative h-44">
+              <canvas id="chart-status-upload"></canvas>
+            </div>
+          </div>
+
+          <!-- Grafik Berdasarkan Status Approved -->
+          <div class="bg-white rounded-none shadow-sm border border-gray-200 p-3">
+            <div class="flex items-center mb-2">
+              <span class="w-5 h-5 rounded-full bg-[#1E88E5] text-white text-[10px] font-bold flex items-center justify-center mr-1.5">1</span>
+              <h4 class="font-bold text-xs text-gray-700">Grafik Berdasarkan Status Approved</h4>
+            </div>
+            <div class="relative h-44">
+              <canvas id="chart-status-approved"></canvas>
+            </div>
           </div>
         </div>
       </section>
@@ -515,14 +545,16 @@
     </main>
 
     <!-- 4. BOTTOM NAVIGATION BAR (Buku Panduan Hal 3 & 6) -->
-    <footer id="bottom-nav" class="bg-white border-t border-gray-200 flex justify-around py-2 shadow-lg z-30 select-none hidden">
-      <button onclick="navigateView('view-home')" id="nav-btn-home" class="flex flex-col items-center text-[#1E88E5] focus:outline-none">
-        <i class="fa-solid fa-house text-lg"></i>
-        <span class="text-[10px] font-semibold mt-0.5">Home</span>
+    <footer id="bottom-nav" class="bg-[#1E88E5] text-white flex justify-around items-center py-2 shadow-lg z-30 select-none hidden">
+      <button onclick="navigateView('view-home')" id="nav-btn-home" class="flex flex-col items-center justify-center space-y-0.5 text-white focus:outline-none">
+        <i class="fa-solid fa-house text-base"></i>
+        <span class="text-[10px] font-semibold">Home</span>
       </button>
-      <button onclick="navigateView('view-dashboard')" id="nav-btn-dashboard" class="flex flex-col items-center text-gray-400 hover:text-[#1E88E5] focus:outline-none">
-        <i class="fa-solid fa-chart-simple text-lg"></i>
-        <span class="text-[10px] font-semibold mt-0.5">Dashboard</span>
+      <button onclick="navigateView('view-dashboard')" id="nav-btn-dashboard" class="flex flex-col items-center justify-center space-y-0.5 text-white focus:outline-none">
+        <span class="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+          <i class="fa-solid fa-gauge-high text-white text-base"></i>
+        </span>
+        <span class="text-[10px] font-semibold">Dashboard</span>
       </button>
     </footer>
 
@@ -933,18 +965,13 @@
         }
       }
 
-      // Foto profil vs inisial (Dashboard)
-      if (dashPhoto && picture) {
-        dashPhoto.src = picture;
+      // Foto profil vs inisial (Dashboard) — selalu tampilkan avatar (fallback online)
+      const dashAvatarFallback = "https://ui-avatars.com/api/?name=User&background=ffffff&color=1E88E5";
+      if (dashPhoto) {
+        dashPhoto.src = picture || dashAvatarFallback;
         dashPhoto.classList.remove('hidden');
-        if (dashInitial) dashInitial.classList.add('hidden');
-      } else {
-        if (dashPhoto) dashPhoto.classList.add('hidden');
-        if (dashInitial) {
-          dashInitial.textContent = initial;
-          dashInitial.classList.remove('hidden');
-        }
       }
+      if (dashInitial) dashInitial.classList.add('hidden');
 
       const inputUser = document.getElementById('input-user-name');
       const inputWa = document.getElementById('input-whatsapp');
@@ -1201,16 +1228,16 @@
       const navHome = document.getElementById('nav-btn-home');
       const navDash = document.getElementById('nav-btn-dashboard');
 
-      navHome.className = "flex flex-col items-center text-gray-400 hover:text-[#1E88E5]";
-      navDash.className = "flex flex-col items-center text-gray-400 hover:text-[#1E88E5]";
+      navHome.className = "flex flex-col items-center justify-center space-y-0.5 text-white/70";
+      navDash.className = "flex flex-col items-center justify-center space-y-0.5 text-white/70";
 
       if (viewId === 'view-home') {
         titleElem.textContent = "Home";
-        navHome.className = "flex flex-col items-center text-[#1E88E5]";
+        navHome.className = "flex flex-col items-center justify-center space-y-0.5 text-white";
       } else if (viewId === 'view-dashboard') {
         titleElem.textContent = "Dashboard";
-        navDash.className = "flex flex-col items-center text-[#1E88E5]";
-        renderDashboard();
+        navDash.className = "flex flex-col items-center justify-center space-y-0.5 text-white";
+        renderDashboardData();
       } else if (viewId === 'view-create-pm') {
         titleElem.textContent = "Create PM";
         resetCreatePMForm();
@@ -1643,32 +1670,163 @@
       navigateView('view-home');
     }
 
-    // RENDER DASHBOARD
-    function renderDashboard() {
+    // ==================== RENDER DASHBOARD (Buku Panduan Hal 11-13) ====================
+    // Instance Chart.js aktif — selalu di-destroy sebelum membuat chart baru.
+    let chartInstances = [];
+
+    function destroyCharts() {
+      chartInstances.forEach(chart => { if (chart) chart.destroy(); });
+      chartInstances = [];
+    }
+
+    // Helper waktu ramah pengguna (relative time)
+    function formatRelativeTime(dateString) {
+      if (!dateString) return '';
+      const str = String(dateString).trim();
+
+      if (/just now/i.test(str)) return 'Just now';
+      if (/yesterday/i.test(str)) return 'Yesterday';
+
+      const todayMatch = str.match(/today,\s*(\d{1,2}):(\d{2})/i);
+      if (todayMatch) return 'Today';
+
+      // Format "DD Mon YYYY" — sudah ramah pengguna, kembalikan apa adanya
+      if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$/.test(str)) return str;
+
+      // Coba parse sebagai tanggal / ISO string lalu hitung selisih relatif
+      const parsed = new Date(str);
+      if (!isNaN(parsed.getTime())) {
+        const diffMs = Date.now() - parsed.getTime();
+        const minutes = Math.floor(diffMs / 60000);
+        if (minutes < 1) return 'Just now';
+        if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+        const days = Math.floor(hours / 24);
+        if (days === 1) return 'Yesterday';
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `${String(parsed.getDate()).padStart(2,'0')} ${months[parsed.getMonth()]} ${parsed.getFullYear()}`;
+      }
+
+      return str;
+    }
+
+    // Tanggal dinamis header Info Account (contoh: Minggu, 02/08/2026)
+    function formatDashboardDate() {
+      return new Date().toLocaleDateString('id-ID', {
+        weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric'
+      });
+    }
+
+    function renderDashboardData() {
+      destroyCharts();
+
       const total = pmDatabase.length;
       const approved = pmDatabase.filter(d => d.status === 'Approved').length;
-      const rejected = pmDatabase.filter(d => d.status === 'Reject' || d.status === 'Duplikat').length;
+      const duplikat = pmDatabase.filter(d => d.status === 'Duplikat').length;
 
+      // Tanggal dinamis
+      const dateEl = document.getElementById('dash-date');
+      if (dateEl) dateEl.textContent = formatDashboardDate();
+
+      // Statistik Information
       document.getElementById('stat-total').textContent = total;
       document.getElementById('stat-approved').textContent = approved;
-      document.getElementById('stat-rejected').textContent = rejected;
+      document.getElementById('stat-duplikat').textContent = duplikat;
 
+      // Badge jumlah tiket pada header Recapitulation
+      document.getElementById('recap-count-badge').textContent = total;
+
+      // Render tabel recapitulation
       const tbody = document.getElementById('recap-table-body');
       tbody.innerHTML = '';
 
       pmDatabase.forEach(item => {
-        const statusColor = item.status === 'Approved'
-          ? 'text-green-700'
-          : (item.status === 'Reject' ? 'text-red-800 font-extrabold' : 'text-orange-600 font-semibold');
+        const isApproved = item.status === 'Approved';
+        const isDuplikat = item.status === 'Duplikat';
+
+        // Wo Number: link biru (Approved) / merah (Duplikat) / abu (lainnya)
+        const woColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-gray-500');
+        // Result: teks status murni tanpa pill tebal
+        const resultColor = isApproved ? 'text-[#0288D1]' : (isDuplikat ? 'text-red-600' : 'text-orange-500');
+        // Photo: thumbnail evidence (fallback online bila belum tersimpan)
+        const photoSrc = item.photoUrl || item.photo || item.evidencePhoto
+          || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(item.indexNumber || 'PM') + '&background=90CAF9&color=ffffff&size=64');
+
         const tr = document.createElement('tr');
         tr.className = "hover:bg-gray-50";
         tr.innerHTML = `
-          <td class="py-2.5 font-bold font-mono">${item.woNumber}</td>
-          <td class="py-2.5 text-gray-500">${item.date}</td>
-          <td class="py-2.5 font-bold ${statusColor}">${item.status}</td>
+          <td class="py-2.5 pr-2 font-semibold font-mono"><a href="#" class="${woColor} underline decoration-dotted">${item.woNumber}</a></td>
+          <td class="py-2.5 pr-2 text-gray-500 whitespace-nowrap">${formatRelativeTime(item.date)}</td>
+          <td class="py-2.5 pr-2 font-medium ${resultColor}">${item.status}</td>
+          <td class="py-2.5"><img src="${photoSrc}" alt="Evidence" class="w-9 h-9 object-cover rounded border border-gray-200"></td>
         `;
         tbody.appendChild(tr);
       });
+
+      renderDashboardCharts();
+    }
+
+    function renderDashboardCharts() {
+      if (typeof Chart === 'undefined') return;
+
+      const userSession = JSON.parse(localStorage.getItem('evitrack_activeSession') || '{}');
+      const emailLabel = userSession.email || userSession.userEmail || 'Teknisi Aktif';
+
+      const totalPm = pmDatabase.length;
+      const duplikat = pmDatabase.filter(d => d.status === 'Duplikat').length;
+      const approved = pmDatabase.filter(d => d.status === 'Approved').length;
+      const reject = pmDatabase.filter(d => d.status === 'Reject').length;
+
+      const outbox = JSON.parse(localStorage.getItem('evitrack_outboxEmails') || '[]');
+      const terkirim = outbox.length;
+      const gagalKirim = outbox.filter(o => o.failed === true || o.status === 'Gagal' || o.status === 'Gagal Kirim').length;
+
+      // Grafik 1: Berdasarkan Status Upload
+      const ctx1 = document.getElementById('chart-status-upload');
+      if (ctx1) {
+        const chart1 = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: [emailLabel],
+            datasets: [
+              { label: 'PM', data: [totalPm], backgroundColor: '#0288D1' },
+              { label: 'Duplikat', data: [duplikat], backgroundColor: '#90CAF9' },
+              { label: 'Gagal Kirim', data: [gagalKirim], backgroundColor: '#E65100' },
+              { label: 'Terkirim', data: [terkirim], backgroundColor: '#FFB74D' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+          }
+        });
+        chartInstances.push(chart1);
+      }
+
+      // Grafik 2: Berdasarkan Status Approved
+      const ctx2 = document.getElementById('chart-status-approved');
+      if (ctx2) {
+        const chart2 = new Chart(ctx2, {
+          type: 'bar',
+          data: {
+            labels: [emailLabel],
+            datasets: [
+              { label: 'Approved', data: [approved], backgroundColor: '#0288D1' },
+              { label: 'Reject', data: [reject], backgroundColor: '#90CAF9' }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { boxWidth: 10, font: { size: 9 } } } },
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+          }
+        });
+        chartInstances.push(chart2);
+      }
     }
 
     // RENDER LIST PREVENTIVE MAINTENANCE
@@ -1816,7 +1974,7 @@
     window.onload = () => {
       document.getElementById('input-wo-number').value = generateWoNumber();
       handleAreaChange();
-      renderDashboard();
+      renderDashboardData();
 
       // Default Kilometer saat inisialisasi pertama: Start & End KM = "0", Total Jarak "0 KM"
       document.getElementById('input-km-start').value = "0";
